@@ -41,13 +41,16 @@
 </head>
 <body class="text-zinc-900 antialiased min-h-screen flex flex-col bg-zinc-50">
 
-<div id="login-screen" class="fixed inset-0 z-[60] bg-zinc-50 flex items-center justify-center p-4">
-  <form onsubmit="handleAuthSubmit(event)" class="bg-white p-8 rounded-2xl border border-zinc-200 w-full max-w-sm space-y-3">
+<div id="login-screen" class="fixed inset-0 z-[60] bg-zinc-50 flex items-center justify-center p-4 overflow-y-auto">
+  <form onsubmit="handleAuthSubmit(event)" class="bg-white p-8 rounded-2xl border border-zinc-200 w-full max-w-sm space-y-3 my-4">
     <h2 class="text-xl font-bold" id="auth-title">社團綜合管理系統</h2>
+    <p id="auth-subtitle" class="text-xs text-zinc-500">請登入以繼續</p>
 
     <div id="signup-fields" class="hidden space-y-3">
       <input id="signup-name" type="text" placeholder="姓名" class="w-full px-3.5 py-2 border rounded-xl">
       <input id="signup-student-id" type="text" placeholder="學號" class="w-full px-3.5 py-2 border rounded-xl">
+      <input id="signup-nationality" type="text" placeholder="國籍（例如：台灣）" class="w-full px-3.5 py-2 border rounded-xl">
+      <input id="signup-dept" type="text" placeholder="系級（例如：資工系 二年級）" class="w-full px-3.5 py-2 border rounded-xl">
     </div>
 
     <input id="login-email" type="email" required placeholder="Email" class="w-full px-3.5 py-2 border rounded-xl">
@@ -466,8 +469,54 @@
 
             let appReady = false;
             
-            async function handleLogin(e) {
+            let authMode = 'login';
             
+            function showAuthError(msg) {
+              const el = document.getElementById('auth-error');
+              el.textContent = msg;
+              el.classList.remove('hidden');
+            }
+            
+            function toggleAuthMode() {
+              authMode = authMode === 'login' ? 'signup' : 'login';
+              const isSignup = authMode === 'signup';
+              document.getElementById('signup-fields').classList.toggle('hidden', !isSignup);
+              document.getElementById('auth-submit').textContent = isSignup ? '建立帳號' : '登入';
+              document.getElementById('auth-subtitle').textContent = isSignup ? '建立新社員帳號' : '請登入以繼續';
+              document.getElementById('auth-toggle').textContent = isSignup ? '已經有帳號？回到登入' : '還沒有帳號？點此註冊';
+              document.getElementById('auth-error').classList.add('hidden');
+            }
+            
+            async function handleAuthSubmit(e) {
+              e.preventDefault();
+              const email = document.getElementById('login-email').value.trim();
+              const password = document.getElementById('login-password').value;
+              document.getElementById('auth-error').classList.add('hidden');
+            
+              if (authMode === 'signup') {
+                const name = document.getElementById('signup-name').value.trim();
+                const student_id = document.getElementById('signup-student-id').value.trim();
+                const nationality = document.getElementById('signup-nationality').value.trim();
+                const dept = document.getElementById('signup-dept').value.trim();
+                if (!name || !student_id) return showAuthError('請填寫姓名與學號');
+            
+                const { data, error } = await sb.auth.signUp({
+                  email, password,
+                  options: { data: { name, student_id, nationality, dept } }
+                });
+                if (error) return showAuthError('註冊失敗：' + error.message);
+            
+                if (!data.session) {   // 有開啟 Email 驗證時不會直接登入
+                  toggleAuthMode();
+                  return showAuthError('註冊成功！請到信箱點驗證連結後再登入。');
+                }
+                return await bootApp();
+              }
+            
+              const { error } = await sb.auth.signInWithPassword({ email, password });
+              if (error) return showAuthError('登入失敗：' + error.message);
+              await bootApp();
+            }            
             async function bootApp() {
               const { data: { user } } = await sb.auth.getUser();
               if (!user) return;
