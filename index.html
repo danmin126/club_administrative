@@ -37,12 +37,23 @@
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(8px);
         }
+        html, body { overflow-x: hidden; }
+        .text-xxs { font-size: 10px; line-height: 14px; }
+
+        /* 彈出視窗在手機上內容太高時可以捲動 */
+        #modal-practice > div, #modal-member > div { max-height: 90vh; overflow-y: auto; }
+        
+        /* 避免 iPhone 點輸入框時自動放大 */
+        @media (max-width: 640px) {
+          input, select, textarea { font-size: 16px !important; }
+        }
     </style>
 </head>
 <body class="text-zinc-900 antialiased min-h-screen flex flex-col bg-zinc-50">
 
 <div id="login-screen" class="fixed inset-0 z-[60] bg-zinc-50 flex items-center justify-center p-4 overflow-y-auto">
   <form onsubmit="handleAuthSubmit(event)" class="bg-white p-8 rounded-2xl border border-zinc-200 w-full max-w-sm space-y-3 my-4">
+    <button type="button" onclick="toggleLang()" class="lang-btn block ml-auto text-xs text-zinc-500 underline">EN</button>
     <h2 class="text-xl font-bold" id="auth-title">社團綜合管理系統</h2>
     <p id="auth-subtitle" class="text-xs text-zinc-500">請登入以繼續</p>
 
@@ -71,7 +82,7 @@
                     <div class="w-10 h-10 rounded-xl bg-zinc-900 flex items-center justify-center text-white font-bold">
                         <i class="fa-solid fa-users-gear text-base"></i>
                     </div>
-                    <div>
+                    <div class="hidden sm:block">
                         <h1 class="font-bold text-zinc-900 text-lg leading-tight tracking-tight">社團綜合管理系統</h1>
                         <p class="text-xs text-zinc-500 font-medium">Club Admin & Community</p>
                     </div>
@@ -84,6 +95,7 @@
 
                 <!-- Current User Badge & Action -->
                 <div class="flex items-center space-x-3">
+                    <button type="button" onclick="toggleLang()" class="lang-btn px-2.5 py-1.5 bg-zinc-100 hover:bg-zinc-200 border border-zinc-300 rounded-xl text-xs font-bold text-zinc-800">EN</button>
                     <button onclick="logout()" class="flex items-center space-x-2 bg-zinc-100 hover:bg-zinc-200 border border-zinc-300 px-3 py-1.5 rounded-xl transition-all text-xs" title="登出">
                         <div id="user-avatar" class="w-6 h-6 rounded-full bg-zinc-900 text-white flex items-center justify-center font-bold text-xs">
                             -
@@ -115,43 +127,43 @@
         <section id="view-dashboard" class="space-y-6">
             <!-- Top Metric Cards -->
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div class="bg-white p-5 rounded-2xl border border-zinc-200 shadow-sm flex items-center space-x-4">
-                    <div class="w-12 h-12 rounded-xl bg-zinc-100 text-zinc-900 flex items-center justify-center text-xl shrink-0">
+                <div class="bg-white p-3 sm:p-5 rounded-2xl border border-zinc-200 shadow-sm flex items-center space-x-3 sm:space-x-4 min-w-0">
+                    <div class="hidden sm:flex w-12 h-12 rounded-xl bg-zinc-100 text-zinc-900 items-center justify-center text-xl shrink-0">
                         <i class="fa-solid fa-user-group"></i>
                     </div>
                     <div>
-                        <p class="text-xs font-semibold text-zinc-400 uppercase tracking-wider">總社員人數</p>
-                        <h3 class="text-2xl font-bold text-zinc-900" id="stat-total-members">0</h3>
+                        <p class="text-[11px] sm:text-xs font-semibold text-zinc-400">總社員人數</p>
+                        <h3 class="text-xl sm:text-2xl font-bold text-zinc-900" id="stat-total-members">0</h3>
                     </div>
                 </div>
 
-                <div class="bg-white p-5 rounded-2xl border border-zinc-200 shadow-sm flex items-center space-x-4">
-                    <div class="w-12 h-12 rounded-xl bg-zinc-100 text-zinc-900 flex items-center justify-center text-xl shrink-0">
+                <div class="bg-white p-3 sm:p-5 rounded-2xl border border-zinc-200 shadow-sm flex items-center space-x-3 sm:space-x-4 min-w-0">
+                    <div class="hidden sm:flex w-12 h-12 rounded-xl bg-zinc-100 text-zinc-900 items-center justify-center text-xl shrink-0">
                         <i class="fa-solid fa-circle-dollar-to-slot"></i>
                     </div>
                     <div>
-                        <p class="text-xs font-semibold text-zinc-400 uppercase tracking-wider">社費繳交率</p>
-                        <h3 class="text-2xl font-bold text-zinc-900" id="stat-fee-rate">0%</h3>
+                        <p class="text-[11px] sm:text-xs font-semibold text-zinc-400">社費繳交率</p>
+                        <h3 class="text-xl sm:text-2xl font-bold text-zinc-900" id="stat-fee-rate">0%</h3>
                     </div>
                 </div>
 
-                <div class="bg-white p-5 rounded-2xl border border-zinc-200 shadow-sm flex items-center space-x-4">
-                    <div class="w-12 h-12 rounded-xl bg-zinc-100 text-zinc-900 flex items-center justify-center text-xl shrink-0">
+                <div class="bg-white p-3 sm:p-5 rounded-2xl border border-zinc-200 shadow-sm flex items-center space-x-3 sm:space-x-4 min-w-0">
+                    <div class="hidden sm:flex w-12 h-12 rounded-xl bg-zinc-100 text-zinc-900 items-center justify-center text-xl shrink-0">
                         <i class="fa-solid fa-clipboard-user"></i>
                     </div>
                     <div>
-                        <p class="text-xs font-semibold text-zinc-400 uppercase tracking-wider">平均團練出席</p>
-                        <h3 class="text-2xl font-bold text-zinc-900" id="stat-avg-attendance">0 次</h3>
+                        <p class="text-[11px] sm:text-xs font-semibold text-zinc-400">平均團練出席</p>
+                        <h3 class="text-xl sm:text-2xl font-bold text-zinc-900" id="stat-avg-attendance">0 次</h3>
                     </div>
                 </div>
 
-                <div class="bg-white p-5 rounded-2xl border border-zinc-200 shadow-sm flex items-center space-x-4">
-                    <div class="w-12 h-12 rounded-xl bg-zinc-100 text-zinc-900 flex items-center justify-center text-xl shrink-0">
+                <div class="bg-white p-3 sm:p-5 rounded-2xl border border-zinc-200 shadow-sm flex items-center space-x-3 sm:space-x-4 min-w-0">
+                    <div class="hidden sm:flex w-12 h-12 rounded-xl bg-zinc-100 text-zinc-900 items-center justify-center text-xl shrink-0">
                         <i class="fa-solid fa-stopwatch"></i>
                     </div>
                     <div>
-                        <p class="text-xs font-semibold text-zinc-400 uppercase tracking-wider">自主練習紀錄</p>
-                        <h3 class="text-2xl font-bold text-zinc-900" id="stat-total-practices">0 次</h3>
+                        <p class="text-[11px] sm:text-xs font-semibold text-zinc-400">自主練習紀錄</p>
+                        <h3 class="text-xl sm:text-2xl font-bold text-zinc-900" id="stat-total-practices">0 次</h3>
                     </div>
                 </div>
             </div>
@@ -227,7 +239,7 @@
             <!-- Member Roster Table -->
             <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
                 <div class="overflow-x-auto">
-                    <table class="w-full text-left text-sm border-collapse">
+                    <table class="w-full text-left text-sm border-collapse min-w-[760px]">
                         <thead>
                             <tr class="bg-slate-50/80 text-slate-500 text-xs uppercase font-semibold border-b border-slate-200/80">
                                 <th class="py-3.5 px-4">社員姓名 / 職務</th>
@@ -315,7 +327,7 @@
                     <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">姓名 <span class="text-rose-500">*</span></label>
                     <input type="text" id="input-name" required placeholder="例如: 陳小明" class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
                 </div>
-                <div class="grid grid-cols-2 gap-3">
+                <div class="class="flex flex-col items-center py-1 flex-1 min-w-0"">
                     <div>
                         <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">學號 <span class="text-rose-500">*</span></label>
                         <input type="text" id="input-student-id" required placeholder="例如: B11001001" class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
@@ -325,7 +337,7 @@
                         <input type="text" id="input-nationality" required placeholder="例如: 台灣" class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
                     </div>
                 </div>
-                <div class="grid grid-cols-2 gap-3">
+                <div class="class="flex flex-col items-center py-1 flex-1 min-w-0"">
                     <div>
                         <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">社團職務 <span class="text-rose-500">*</span></label>
                         <select id="input-role" class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 font-semibold text-slate-700">
@@ -338,7 +350,7 @@
                         <input type="text" id="input-dept" placeholder="例如: 資工系 二年級" class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
                     </div>
                 </div>
-                <div class="grid grid-cols-2 gap-3">
+                <div class="class="flex flex-col items-center py-1 flex-1 min-w-0"">
                     <div>
                         <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">繳交社費</label>
                         <select id="input-fee-paid" class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
@@ -449,7 +461,7 @@
     </div>
 
     <!-- Notification Toast Container -->
-    <div id="toast-container" class="fixed bottom-5 right-5 z-[70] flex flex-col space-y-2 pointer-events-none"></div>
+    <div fixed bottom-5 right-5 left-5 sm:left-auto items-end z-[70] flex flex-col space-y-2 pointer-events-none"></div>
 
     <script>
        const sb = supabase.createClient('https://ojoharpeifmawtsldviw.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9qb2hhcnBlaWZtYXd0c2xkdml3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEzNDA1MjksImV4cCI6MjEwNjkxNjUyOX0.g1jFw-8Vyl_y1pu1o8y7IeilsbVyUA-CIuvDCpQbm5o');
@@ -1043,13 +1055,13 @@
                     ? `<span class="bg-zinc-900 text-white text-xxs px-1.5 py-0.2 rounded font-bold">幹部</span>`
                     : `<span class="bg-zinc-100 text-zinc-600 border border-zinc-200 text-xxs px-1.5 py-0.2 rounded font-medium">社員</span>`;
 
-                const formattedTime = new Date(p.datetime).toLocaleString('zh-TW', {
+                const formattedTime = new Date(p.datetime).toLocaleString((currentLang === 'en' ? 'en-US' : 'zh-TW'), {
                     month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit'
                 });
 
                 card.innerHTML = `
                   <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-1.5 text-xs text-zinc-500 mb-1.5">
+                    <div class="flex items-center gap-1.5 text-xs text-zinc-500 mb-1.5 flex-wrap">
                       <span class="font-semibold text-zinc-800">${p.memberName}</span>
                       ${roleBadge}
                       <span>· ${p.dept || ''} · ${formattedTime}</span>
@@ -1083,7 +1095,7 @@
         }
 
        async function deletePractice(id) {
-          if (!confirm('確定要刪除這篇打卡紀錄嗎？')) return;
+          if (!confirm(tr('確定要刪除這篇打卡紀錄嗎？'))) return;
           const { error } = await sb.from('practices').delete().eq('id', id);
           if (error) return showToast('沒有權限刪除', 'error');
           await loadPractices();
@@ -1275,6 +1287,7 @@
 
         function updateChartsData(paid, unpaid) {
             if (feeChartInstance) {
+                feeChartInstance.data.labels = [tr('已繳交'), tr('未繳交')];
                 feeChartInstance.data.datasets[0].data = [paid, unpaid];
                 feeChartInstance.update();
             }
@@ -1325,6 +1338,162 @@
                 setTimeout(() => toast.remove(), 300);
             }, 3000);
         }
+        // ===== 中英文切換 =====
+        let currentLang = 'zh';
+        try { currentLang = localStorage.getItem('club_lang') || 'zh'; } catch (e) {}
+        
+        const I18N_EN = {
+          // 標題與導覽
+          '社團綜合管理系統':'Club Management System','載入中...':'Loading...','自主打卡':'Log Practice',
+          '登出':'Log out','幹部':'Officer','社員':'Member',
+          '行政總覽':'Dashboard','社員名冊與社費':'Members & Fees','團練出席審核':'Attendance Review',
+          '團練簽到點名':'Attendance Check-in','太極社練習交流牆':'Practice Wall',
+          '總覽':'Overview','名冊':'Roster','簽到點名':'Check-in','太極社牆':'Wall',
+          // 儀表板
+          '總社員人數':'Total Members','社費繳交率':'Fee Rate','平均團練出席':'Avg. Attendance','自主練習紀錄':'Practice Logs',
+          '社費繳交狀況':'Fee Status','已繳費與未繳費統計比例':'Paid vs. unpaid','社員國籍結構':'Nationalities',
+          '本地生與國際學生比例':'Local vs. international students','待審核簽到':'Pending Check-ins',
+          '社員自主勾選待幹部確認':'Awaiting officer approval','前往審核 →':'Review →',
+          '目前沒有待審核的社員簽到':'No pending check-ins','核准':'Approve','未填寫':'Not set',
+          // 名冊
+          '搜尋姓名、學號、國籍...':'Search name, student ID, nationality...',
+          '全部社費狀態':'All fee statuses','已繳社費':'Paid','未繳社費':'Unpaid',
+          '匯出 CSV':'Export CSV','新增社員':'Add Member',
+          '社員姓名 / 職務':'Name / Role','學號':'Student ID','國籍':'Nationality','系級與備註':'Dept. & Notes',
+          '社費狀態':'Fee Status','團練出席':'Attendance','操作':'Actions','次':'times',
+          '已繳交':'Paid','未繳交':'Unpaid','找不到符合條件的社員資料':'No matching members found',
+          '編輯社員':'Edit member','刪除社員':'Delete member',
+          // 簽到
+          '例行團練點名與簽到':'Practice Roll Call','社員可自行勾選簽到，由幹部進行最終出席審核確認':'Members check in; officers confirm',
+          '團練日期：':'Practice date:','團練簽到審核面板 (幹部權限)':'Check-in Review (Officer)',
+          '一鍵全選審核通過':'Approve All','已核准':'Approved','核准簽到':'Approve','代補簽到':'Check in for member',
+          '團練出席自主簽到':'Self Check-in','選擇日期勾選「自主簽到」，送出後將由幹部進行審核確認。':'Pick a date and check in. An officer will review it.',
+          '尚未簽到':'Not checked in','幹部已核准出席':'Approved by officer','已簽到，待幹部確認':'Checked in, awaiting approval',
+          '已於今日發送簽到紀錄，等待幹部審核完成。':'Check-in sent. Waiting for officer approval.',
+          // 練習牆
+          '社團練習交流牆':'Practice Wall','公開自主練習照片與心得，交流技藝與成長記錄':'Share practice photos and notes',
+          '熱門公開牆':'Public Wall','我的私密打卡':'My Private Logs','尚無練習打卡文章。':'No practice posts yet.',
+          '發布第一篇自主練習打卡 →':'Post your first check-in →','無填寫心得說明':'No notes','今日練習打卡':"Today's practice",
+          '🌐 公開文章':'🌐 Public','🔒 僅個人可見':'🔒 Only you','刪除文章':'Delete post',
+          // 視窗
+          '新增社團成員':'Add Club Member','編輯社員資料':'Edit Member','姓名':'Name','社團職務':'Role',
+          '幹部 (高權限)':'Officer (high access)','社員 (一般)':'Member (standard)','系級說明':'Department',
+          '繳交社費':'Fee Paid','累積出勤數':'Total Attendance','取消':'Cancel','儲存資料':'Save',
+          '例如: 陳小明':'e.g. Alex Chen','例如: B11001001':'e.g. B11001001','例如: 台灣':'e.g. Taiwan','例如: 資工系 二年級':'e.g. CS, Year 2',
+          '自主練習打卡發表':'Post a Practice Check-in','發文身份：':'Posting as:',
+          '公開發布至太極社社團練習牆':'Post to the public Practice Wall','關閉後僅有您自己能看到此筆打卡':'Only you can see it when off',
+          '練習時間':'Practice time','練習地點':'Location','例如: 體育館 3 樓舞房 / 綜合大樓 201':'e.g. Gym 3F studio / Building 201',
+          'GPS定位':'GPS','練習現場照片':'Practice photo','上傳照片或拍攝':'Upload or take a photo','支援 JPG, PNG 圖片格式':'JPG, PNG supported',
+          '心得與練習內容':'Notes','撰寫今日自主練習心得，交流技藝...':"Write about today's practice...",'發布打卡':'Post',
+          // 登入
+          '請登入以繼續':'Please log in to continue','建立新社員帳號':'Create a member account','姓名':'Name',
+          '國籍（例如：台灣）':'Nationality (e.g. Taiwan)','系級（例如：資工系 二年級）':'Dept. (e.g. CS, Year 2)',
+          '密碼（至少 6 碼）':'Password (min. 6 characters)','登入':'Log in','建立帳號':'Create account',
+          '還沒有帳號？點此註冊':'No account? Sign up','已經有帳號？回到登入':'Have an account? Log in',
+          // 提示訊息
+          '「行政總覽」與「社員名冊」為幹部專屬存取權限':'Dashboard and Roster are officer-only',
+          '社員資料已儲存成功！':'Member saved!','已開始下載 CSV 社員名冊！':'CSV download started!',
+          '已完成自主簽到！待幹部審核':'Checked in! Awaiting officer approval','已核准出席':'Attendance approved',
+          '你今天已經簽到過了':'You already checked in','你這天已經簽到過了':'You already checked in',
+          '沒有權限':'Permission denied','沒有權限刪除':'No permission to delete','文章已刪除':'Post deleted',
+          '正在進行 GPS 定位中...':'Getting GPS location...','成功取得目前 GPS 位置！':'GPS location found!',
+          '預設定位完成（未能取得精準 GPS）':'Default location set (no precise GPS)','您的裝置不支援地理定位':'Geolocation not supported',
+          '請上傳或拍攝一張現場練習照片':'Please add a practice photo','打卡文章已成功發表！':'Posted!',
+          '請填寫姓名與學號':'Please enter name and student ID','註冊成功！請到信箱點驗證連結後再登入。':'Signed up! Verify your email, then log in.',
+          '找不到個人資料，請聯絡幹部':'Profile not found. Contact an officer.',
+          '確定要刪除這篇打卡紀錄嗎？':'Delete this post?'
+        };
+        
+        const I18N_PATTERNS = [
+          [/^已成功刪除社員 (.+)$/, 'Deleted member $1'],
+          [/^已核准 (.+) 的團練出席$/, 'Approved attendance for $1'],
+          [/^一鍵審核完成！共核准 (\d+) 筆簽到$/, 'Done! $1 check-in(s) approved'],
+          [/^已為 (.+) 完成幹部補簽並累加出席$/, 'Checked in $1 on their behalf'],
+          [/^該日收到 (\d+) 筆社員簽到申請$/, '$1 request(s) for this date'],
+          [/^正在審核 (.+) 的團練出席申請；核准後自動累加社員出席計數。$/, 'Reviewing $1. Approved check-ins add to attendance.'],
+          [/^已累積出席: (\d+) 次$/, 'Attendance: $1'],
+          [/^學號: (.*) ‧ 目前總出席: (\d+) 次$/, 'Student ID: $1 ‧ Total attendance: $2'],
+          [/^勾選完成 (.+) 團練簽到$/, 'Check in for $1'],
+          [/^(.+) \(社員\)$/, '$1 (Member)'],
+          [/^(\d+) 人$/, '$1'],
+          [/^([\d.]+) 次$/, '$1 times'],
+          [/^(\d+) 則留言$/, '$1 comments'],
+          [/^社團成員 ‧ (.*)$/, 'Club member ‧ $1'],
+          [/^登入失敗：(.*)$/, 'Login failed: $1'],
+          [/^註冊失敗：(.*)$/, 'Sign-up failed: $1'],
+          [/^照片上傳失敗：(.*)$/, 'Photo upload failed: $1'],
+          [/^發布失敗：(.*)$/, 'Post failed: $1']
+        ];
+        
+        // 翻譯一段字串（也可用在 confirm() 之類）
+        function tr(s) {
+          if (currentLang !== 'en') return s;
+          const key = s.trim();
+          if (I18N_EN[key] !== undefined) return s.replace(key, () => I18N_EN[key]);
+          for (const [re, rep] of I18N_PATTERNS) {
+            if (re.test(key)) return s.replace(key, () => key.replace(re, rep));
+          }
+          return s;
+        }
+        
+        const origText = new WeakMap();
+        const HAS_ZH = /[\u4e00-\u9fff]/;
+        
+        function i18nText(node) {
+          let orig = origText.get(node);
+          if (orig === undefined) {
+            if (!HAS_ZH.test(node.nodeValue)) return;
+            orig = node.nodeValue;
+            origText.set(node, orig);
+          }
+          const out = currentLang === 'en' ? tr(orig) : orig;
+          if (node.nodeValue !== out) node.nodeValue = out;
+        }
+        
+        function i18nAttrs(el) {
+          ['placeholder', 'title'].forEach(a => {
+            if (!el.hasAttribute(a)) return;
+            const k = 'data-orig-' + a;
+            if (!el.hasAttribute(k)) {
+              const v = el.getAttribute(a);
+              if (!HAS_ZH.test(v)) return;
+              el.setAttribute(k, v);
+            }
+            const o = el.getAttribute(k);
+            el.setAttribute(a, currentLang === 'en' ? tr(o) : o);
+          });
+        }
+        
+        function i18nWalk(n) {
+          if (n.nodeType === 3) return i18nText(n);
+          if (n.nodeType !== 1 || /^(SCRIPT|STYLE)$/.test(n.nodeName)) return;
+          i18nAttrs(n);
+          n.childNodes.forEach(i18nWalk);
+        }
+        
+        // 之後由程式動態產生的內容（表格、提示訊息等）會自動翻譯
+        new MutationObserver(muts => {
+          if (currentLang !== 'en') return;
+          muts.forEach(m => m.addedNodes.forEach(i18nWalk));
+        }).observe(document.body, { childList: true, subtree: true });
+        
+        function updateLangButtons() {
+          document.querySelectorAll('.lang-btn').forEach(b => b.textContent = currentLang === 'en' ? '中文' : 'EN');
+        }
+        
+        function setLang(lang) {
+          currentLang = lang;
+          try { localStorage.setItem('club_lang', lang); } catch (e) {}
+          document.documentElement.lang = lang === 'en' ? 'en' : 'zh-TW';
+          i18nWalk(document.documentElement);
+          updateLangButtons();
+          if (currentUser) switchTab(currentTab);   // 重新繪製圖表標籤與日期格式
+        }
+        
+        function toggleLang() { setLang(currentLang === 'en' ? 'zh' : 'en'); }
+        
+        // 頁面載入時套用上次選擇的語言
+        if (currentLang === 'en') setLang('en'); else updateLangButtons();
     </script>
 </body>
 </html>
