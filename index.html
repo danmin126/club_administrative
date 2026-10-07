@@ -256,13 +256,13 @@
             </div>
         </section>
 
-        <!-- VIEW 4: SELF-PRACTICE FEED (DCARD STYLE COMMUNITY WALL) -->
+        <!-- VIEW 4: SELF-PRACTICE FEED (太極社 STYLE COMMUNITY WALL) -->
         <section id="view-practice" class="hidden space-y-6">
             <!-- Feed Sub Header & Filters -->
             <div class="bg-white p-4 rounded-2xl border border-zinc-200 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                     <h3 class="text-xl font-bold text-zinc-900 flex items-center tracking-tight">
-                        <span class="bg-zinc-900 text-white text-xs font-black px-2 py-0.5 rounded mr-2 uppercase tracking-wider">DCARD</span> 社團練習交流牆
+                        <span class="bg-zinc-900 text-white text-xs font-black px-2 py-0.5 rounded mr-2 uppercase tracking-wider">太極社</span> 社團練習交流牆
                     </h3>
                     <p class="text-xs text-zinc-500">公開自主練習照片與心得，交流技藝與成長記錄</p>
                 </div>
@@ -278,9 +278,9 @@
                 </div>
             </div>
 
-            <!-- Dcard Feed Grid Container -->
+            <!-- 太極社 Feed Grid Container -->
             <div id="practice-feed-grid" class="max-w-2xl mx-auto space-y-5">
-                <!-- Dynamic Dcard Cards -->
+                <!-- Dynamic 太極社 Cards -->
             </div>
         </section>
     </main>
@@ -372,7 +372,7 @@
                 <!-- Public visibility toggle -->
                 <div class="flex items-center justify-between p-3 bg-zinc-50 rounded-xl border border-zinc-200">
                     <div>
-                        <p class="text-xs font-bold text-zinc-800">公開發布至 Dcard 社團練習牆</p>
+                        <p class="text-xs font-bold text-zinc-800">公開發布至 太極社 社團練習牆</p>
                         <p class="text-xxs text-zinc-500">關閉後僅有您自己能看到此筆打卡</p>
                     </div>
                     <label class="relative inline-flex items-center cursor-pointer">
@@ -557,7 +557,7 @@
                     <i class="fa-solid fa-calendar-check mr-1.5"></i>${isOfficer ? '團練出席審核' : '團練簽到點名'}
                 </button>
                 <button onclick="switchTab('practice')" id="nav-practice" class="nav-btn px-3.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 transition-all">
-                    <i class="fa-solid fa-fire mr-1.5 text-sky-500"></i>Dcard 練習交流牆
+                    <i class="fa-solid fa-fire mr-1.5 text-sky-500"></i>太極社 練習交流牆
                 </button>
             `;
             dnav.innerHTML = desktopHTML;
@@ -578,7 +578,7 @@
                     <i class="fa-solid fa-calendar-check text-base mb-0.5"></i>簽到點名
                 </button>
                 <button onclick="switchTab('practice')" id="mnav-practice" class="flex flex-col items-center py-1">
-                    <i class="fa-solid fa-fire text-base mb-0.5 text-sky-500"></i>Dcard牆
+                    <i class="fa-solid fa-fire text-base mb-0.5 text-sky-500"></i>太極社牆
                 </button>
             `;
             mnav.innerHTML = mobileHTML;
@@ -944,8 +944,8 @@
             showToast('已完成幹部補簽', 'info');
         }
       
-        // --- STREAMING_CHUNK:Implementing Dcard Practice Community Feed... ---
-        // --- DCARD PRACTICE COMMUNITY WALL ---
+        // --- STREAMING_CHUNK:Implementing 太極社 Practice Community Feed... ---
+        // --- 太極社 PRACTICE COMMUNITY WALL ---
         function switchPracticeSubTab(tab) {
             activePracticeSubTab = tab;
             document.getElementById('ptab-public').className = tab === 'public' 
