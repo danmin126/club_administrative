@@ -41,14 +41,24 @@
 </head>
 <body class="text-zinc-900 antialiased min-h-screen flex flex-col bg-zinc-50">
 
-  <div id="login-screen" class="fixed inset-0 z-[60] bg-zinc-50 flex items-center justify-center p-4">
-    <form onsubmit="handleLogin(event)" class="bg-white p-8 rounded-2xl border border-zinc-200 w-full max-w-sm space-y-4">
-      <h2 class="text-xl font-bold">社團綜合管理系統</h2>
-      <input id="login-email" type="email" required placeholder="Email" class="w-full px-3.5 py-2 border rounded-xl">
-      <input id="login-password" type="password" required placeholder="密碼" class="w-full px-3.5 py-2 border rounded-xl">
-      <button class="w-full py-2.5 bg-zinc-900 text-white rounded-xl font-semibold">登入</button>
-    </form>
-  </div>
+<div id="login-screen" class="fixed inset-0 z-[60] bg-zinc-50 flex items-center justify-center p-4">
+  <form onsubmit="handleAuthSubmit(event)" class="bg-white p-8 rounded-2xl border border-zinc-200 w-full max-w-sm space-y-3">
+    <h2 class="text-xl font-bold" id="auth-title">社團綜合管理系統</h2>
+
+    <div id="signup-fields" class="hidden space-y-3">
+      <input id="signup-name" type="text" placeholder="姓名" class="w-full px-3.5 py-2 border rounded-xl">
+      <input id="signup-student-id" type="text" placeholder="學號" class="w-full px-3.5 py-2 border rounded-xl">
+    </div>
+
+    <input id="login-email" type="email" required placeholder="Email" class="w-full px-3.5 py-2 border rounded-xl">
+    <input id="login-password" type="password" required minlength="6" placeholder="密碼（至少 6 碼）" class="w-full px-3.5 py-2 border rounded-xl">
+
+    <p id="auth-error" class="hidden text-sm text-red-600"></p>
+
+    <button type="submit" id="auth-submit" class="w-full py-2.5 bg-zinc-900 text-white rounded-xl font-semibold">登入</button>
+    <button type="button" id="auth-toggle" onclick="toggleAuthMode()" class="w-full text-sm text-zinc-500 underline">還沒有帳號？點此註冊</button>
+  </form>
+</div>
     <!-- Top Navigation Header -->
     <header class="sticky top-0 z-30 glass-header border-b border-zinc-200">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -436,7 +446,7 @@
     </div>
 
     <!-- Notification Toast Container -->
-    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+    <div id="toast-container" class="fixed bottom-5 right-5 z-[70] flex flex-col space-y-2 pointer-events-none"></div>
 
     <script>
        const sb = supabase.createClient('https://ojoharpeifmawtsldviw.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9qb2hhcnBlaWZtYXd0c2xkdml3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEzNDA1MjksImV4cCI6MjEwNjkxNjUyOX0.g1jFw-8Vyl_y1pu1o8y7IeilsbVyUA-CIuvDCpQbm5o');
@@ -457,20 +467,12 @@
             let appReady = false;
             
             async function handleLogin(e) {
-              e.preventDefault();
-              const { error } = await sb.auth.signInWithPassword({
-                email: document.getElementById('login-email').value,
-                password: document.getElementById('login-password').value
-              });
-              if (error) return showToast('登入失敗：' + error.message, 'error');
-              await bootApp();
-            }
             
             async function bootApp() {
               const { data: { user } } = await sb.auth.getUser();
               if (!user) return;
               const { data: p, error } = await sb.from('profiles').select('*').eq('id', user.id).single();
-              if (error || !p) return showToast('找不到個人資料', 'error');
+              if (error || !p) return showAuthError('找不到個人資料，請聯絡幹部');
             
               currentUser = { id: p.id, name: p.name, role: p.role, studentId: p.student_id,
                               nationality: p.nationality, dept: p.dept, feePaid: p.fee_paid, attendance: 0 };
