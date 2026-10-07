@@ -1,0 +1,1279 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>社團行政與自主練習打卡系統</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js for Dashboards -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Google Fonts Inter / Noto Sans TC -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans TC', sans-serif;
+            background-color: #fafafa;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f4f4f5;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #d4d4d8;
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #a1a1aa;
+        }
+        .glass-header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(8px);
+        }
+    </style>
+</head>
+<body class="text-zinc-900 antialiased min-h-screen flex flex-col bg-zinc-50">
+
+  <div id="login-screen" class="fixed inset-0 z-[60] bg-zinc-50 flex items-center justify-center p-4">
+    <form onsubmit="handleLogin(event)" class="bg-white p-8 rounded-2xl border border-zinc-200 w-full max-w-sm space-y-4">
+      <h2 class="text-xl font-bold">社團綜合管理系統</h2>
+      <input id="login-email" type="email" required placeholder="Email" class="w-full px-3.5 py-2 border rounded-xl">
+      <input id="login-password" type="password" required placeholder="密碼" class="w-full px-3.5 py-2 border rounded-xl">
+      <button class="w-full py-2.5 bg-zinc-900 text-white rounded-xl font-semibold">登入</button>
+    </form>
+  </div>
+    <!-- Top Navigation Header -->
+    <header class="sticky top-0 z-30 glass-header border-b border-zinc-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <!-- Brand / Logo -->
+                <div class="flex items-center space-x-3 cursor-pointer" onclick="switchTab('dashboard')">
+                    <div class="w-10 h-10 rounded-xl bg-zinc-900 flex items-center justify-center text-white font-bold">
+                        <i class="fa-solid fa-users-gear text-base"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-zinc-900 text-lg leading-tight tracking-tight">社團綜合管理系統</h1>
+                        <p class="text-xs text-zinc-500 font-medium">Club Admin & Community</p>
+                    </div>
+                </div>
+
+                <!-- Desktop Nav Tabs -->
+                <nav id="desktop-nav" class="hidden md:flex space-x-1 bg-zinc-100 p-1.5 rounded-xl border border-zinc-200">
+                    <!-- Rendered dynamically via JS -->
+                </nav>
+
+                <!-- Current User Badge & Action -->
+                <div class="flex items-center space-x-3">
+                    <button onclick="logout()" class="flex items-center space-x-2 bg-zinc-100 hover:bg-zinc-200 border border-zinc-300 px-3 py-1.5 rounded-xl transition-all text-xs" title="登出">
+                        <div id="user-avatar" class="w-6 h-6 rounded-full bg-zinc-900 text-white flex items-center justify-center font-bold text-xs">
+                            -
+                        </div>
+                        <div class="text-left hidden sm:block">
+                            <span id="user-display-name" class="font-semibold text-zinc-900 block leading-none">載入中...</span>
+                            <span id="user-role-badge" class="inline-block mt-0.5 text-xxs px-1.5 py-0.2 rounded font-bold"></span>
+                        </div>
+                        <i class="fa-solid fa-right-from-bracket text-zinc-400 text-xs ml-1"></i>
+                    </button>
+
+                    <button onclick="openPracticeModal()" class="bg-zinc-900 hover:bg-black text-white px-3.5 py-2 rounded-xl text-sm font-medium transition-all flex items-center shrink-0 shadow-sm">
+                        <i class="fa-solid fa-plus mr-1.5"></i>自主打卡
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Mobile Bottom Nav -->
+        <div id="mobile-nav" class="md:hidden flex border-t border-slate-200 bg-white justify-around py-2 px-1 text-xs font-medium text-slate-600">
+            <!-- Rendered dynamically via JS -->
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+        <!-- VIEW 1: DASHBOARD (OFFICERS ONLY) -->
+        <section id="view-dashboard" class="space-y-6">
+            <!-- Top Metric Cards -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="bg-white p-5 rounded-2xl border border-zinc-200 shadow-sm flex items-center space-x-4">
+                    <div class="w-12 h-12 rounded-xl bg-zinc-100 text-zinc-900 flex items-center justify-center text-xl shrink-0">
+                        <i class="fa-solid fa-user-group"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold text-zinc-400 uppercase tracking-wider">總社員人數</p>
+                        <h3 class="text-2xl font-bold text-zinc-900" id="stat-total-members">0</h3>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl border border-zinc-200 shadow-sm flex items-center space-x-4">
+                    <div class="w-12 h-12 rounded-xl bg-zinc-100 text-zinc-900 flex items-center justify-center text-xl shrink-0">
+                        <i class="fa-solid fa-circle-dollar-to-slot"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold text-zinc-400 uppercase tracking-wider">社費繳交率</p>
+                        <h3 class="text-2xl font-bold text-zinc-900" id="stat-fee-rate">0%</h3>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl border border-zinc-200 shadow-sm flex items-center space-x-4">
+                    <div class="w-12 h-12 rounded-xl bg-zinc-100 text-zinc-900 flex items-center justify-center text-xl shrink-0">
+                        <i class="fa-solid fa-clipboard-user"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold text-zinc-400 uppercase tracking-wider">平均團練出席</p>
+                        <h3 class="text-2xl font-bold text-zinc-900" id="stat-avg-attendance">0 次</h3>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl border border-zinc-200 shadow-sm flex items-center space-x-4">
+                    <div class="w-12 h-12 rounded-xl bg-zinc-100 text-zinc-900 flex items-center justify-center text-xl shrink-0">
+                        <i class="fa-solid fa-stopwatch"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold text-zinc-400 uppercase tracking-wider">自主練習紀錄</p>
+                        <h3 class="text-2xl font-bold text-zinc-900" id="stat-total-practices">0 次</h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dashboard Analytics Charts -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Fee Payment Status Chart -->
+                <div class="bg-white p-5 rounded-2xl border border-zinc-200 shadow-sm flex flex-col justify-between">
+                    <div class="mb-2">
+                        <h4 class="font-bold text-zinc-900 text-base">社費繳交狀況</h4>
+                        <p class="text-xs text-zinc-500">已繳費與未繳費統計比例</p>
+                    </div>
+                    <div class="relative flex items-center justify-center h-48">
+                        <canvas id="feeChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Member Nationality Chart -->
+                <div class="bg-white p-5 rounded-2xl border border-zinc-200 shadow-sm flex flex-col justify-between">
+                    <div class="mb-2">
+                        <h4 class="font-bold text-zinc-900 text-base">社員國籍結構</h4>
+                        <p class="text-xs text-zinc-500">本地生與國際學生比例</p>
+                    </div>
+                    <div class="relative flex items-center justify-center h-48">
+                        <canvas id="nationalityChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Quick Attendance Approvals Widget -->
+                <div class="bg-white p-5 rounded-2xl border border-zinc-200 shadow-sm flex flex-col">
+                    <div class="flex justify-between items-center mb-3">
+                        <div>
+                            <h4 class="font-bold text-zinc-900 text-base">待審核簽到</h4>
+                            <p class="text-xs text-zinc-500">社員自主勾選待幹部確認</p>
+                        </div>
+                        <button onclick="switchTab('attendance')" class="text-xs font-semibold text-zinc-900 underline hover:text-black">前往審核 &rarr;</button>
+                    </div>
+                    <div id="dashboard-pending-attendance" class="space-y-2 overflow-y-auto max-h-52 custom-scrollbar pr-1">
+                        <!-- Dynamic content -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- VIEW 2: MEMBER ROSTER & FEES (OFFICERS ONLY) -->
+        <section id="view-members" class="hidden space-y-5">
+            <!-- Header & Filters Toolbar -->
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-2xl border border-zinc-200 shadow-sm">
+                <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                    <!-- Search Input -->
+                    <div class="relative flex-grow sm:flex-grow-0 sm:w-64">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm"></i>
+                        <input type="text" id="member-search" oninput="renderMembersTable()" placeholder="搜尋姓名、學號、國籍..." class="w-full pl-9 pr-3 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-900/20 focus:border-zinc-900">
+                    </div>
+                    <!-- Fee Filter -->
+                    <select id="fee-filter" onchange="renderMembersTable()" class="px-3 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-900/20 text-zinc-700">
+                        <option value="ALL">全部社費狀態</option>
+                        <option value="PAID">已繳社費</option>
+                        <option value="UNPAID">未繳社費</option>
+                    </select>
+                </div>
+
+                <div class="flex items-center space-x-2 w-full sm:w-auto justify-end">
+                    <button onclick="exportCSV()" class="px-3.5 py-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-sm font-medium rounded-xl transition-all flex items-center border border-zinc-200">
+                        <i class="fa-solid fa-file-csv mr-1.5 text-zinc-700"></i>匯出 CSV
+                    </button>
+                    <button onclick="openMemberModal()" class="px-4 py-2 bg-zinc-900 hover:bg-black text-white text-sm font-medium rounded-xl shadow-sm transition-all flex items-center">
+                        <i class="fa-solid fa-user-plus mr-1.5"></i>新增社員
+                    </button>
+                </div>
+            </div>
+
+            <!-- Member Roster Table -->
+            <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50/80 text-slate-500 text-xs uppercase font-semibold border-b border-slate-200/80">
+                                <th class="py-3.5 px-4">社員姓名 / 職務</th>
+                                <th class="py-3.5 px-4">學號</th>
+                                <th class="py-3.5 px-4">國籍</th>
+                                <th class="py-3.5 px-4">系級與備註</th>
+                                <th class="py-3.5 px-4">社費狀態</th>
+                                <th class="py-3.5 px-4">團練出席</th>
+                                <th class="py-3.5 px-4 text-right">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="members-table-body" class="divide-y divide-slate-100 font-normal text-slate-700">
+                            <!-- Dynamic rendering -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- VIEW 3: ATTENDANCE (ROLE-ADAPTIVE) -->
+        <section id="view-attendance" class="hidden space-y-5">
+            <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
+                <!-- Header block -->
+                <div class="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-6 pb-4 border-b border-slate-100">
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-800" id="attendance-view-title">例行團練點名與簽到</h3>
+                        <p class="text-xs text-slate-500" id="attendance-view-desc">社員可自行勾選簽到，由幹部進行最終出席審核確認</p>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <label for="rollcall-date" class="text-xs font-semibold text-slate-600">團練日期：</label>
+                        <input type="date" id="rollcall-date" onchange="renderAttendanceView()" class="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
+                    </div>
+                </div>
+
+                <!-- Dynamic Attendance Area -->
+                <div id="attendance-content-area">
+                    <!-- Dynamic Member Sign-in Panel OR Officer Approval Grid -->
+                </div>
+            </div>
+        </section>
+
+        <!-- VIEW 4: SELF-PRACTICE FEED (DCARD STYLE COMMUNITY WALL) -->
+        <section id="view-practice" class="hidden space-y-6">
+            <!-- Feed Sub Header & Filters -->
+            <div class="bg-white p-4 rounded-2xl border border-zinc-200 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <h3 class="text-xl font-bold text-zinc-900 flex items-center tracking-tight">
+                        <span class="bg-zinc-900 text-white text-xs font-black px-2 py-0.5 rounded mr-2 uppercase tracking-wider">DCARD</span> 社團練習交流牆
+                    </h3>
+                    <p class="text-xs text-zinc-500">公開自主練習照片與心得，交流技藝與成長記錄</p>
+                </div>
+
+                <!-- Feed Sub Tabs -->
+                <div class="flex items-center space-x-2 bg-zinc-100 p-1 rounded-xl border border-zinc-200">
+                    <button onclick="switchPracticeSubTab('public')" id="ptab-public" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all bg-zinc-900 text-white shadow-sm">
+                        <i class="fa-solid fa-fire mr-1"></i>熱門公開牆
+                    </button>
+                    <button onclick="switchPracticeSubTab('mine')" id="ptab-mine" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-zinc-600 transition-all">
+                        <i class="fa-solid fa-user-lock mr-1"></i>我的私密打卡
+                    </button>
+                </div>
+            </div>
+
+            <!-- Dcard Feed Grid Container -->
+            <div id="practice-feed-grid" class="max-w-2xl mx-auto space-y-5">
+                <!-- Dynamic Dcard Cards -->
+            </div>
+        </section>
+    </main>
+
+   
+
+    <!-- MODAL: ADD/EDIT MEMBER -->
+    <div id="modal-member" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-100 overflow-hidden transform transition-all">
+            <div class="px-6 py-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+                <h3 id="modal-member-title" class="font-bold text-slate-800">新增社團成員</h3>
+                <button onclick="closeMemberModal()" class="text-slate-400 hover:text-slate-600 text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <form id="form-member" onsubmit="handleMemberSubmit(event)" class="p-6 space-y-4">
+                <input type="hidden" id="member-id">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">姓名 <span class="text-rose-500">*</span></label>
+                    <input type="text" id="input-name" required placeholder="例如: 陳小明" class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">學號 <span class="text-rose-500">*</span></label>
+                        <input type="text" id="input-student-id" required placeholder="例如: B11001001" class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">國籍 <span class="text-rose-500">*</span></label>
+                        <input type="text" id="input-nationality" required placeholder="例如: 台灣" class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">社團職務 <span class="text-rose-500">*</span></label>
+                        <select id="input-role" class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 font-semibold text-slate-700">
+                            <option value="OFFICER">幹部 (高權限)</option>
+                            <option value="MEMBER" selected>社員 (一般)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">系級說明</label>
+                        <input type="text" id="input-dept" placeholder="例如: 資工系 二年級" class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">繳交社費</label>
+                        <select id="input-fee-paid" class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
+                            <option value="false">未繳交</option>
+                            <option value="true">已繳交</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">累積出勤數</label>
+                        <input type="number" id="input-attendance" min="0" value="0" class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
+                    </div>
+                </div>
+
+                <div class="pt-3 flex justify-end space-x-2">
+                    <button type="button" onclick="closeMemberModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium rounded-xl transition-all">取消</button>
+                    <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl shadow-sm transition-all">儲存資料</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: SELF-PRACTICE CHECK-IN -->
+    <div id="modal-practice" class="fixed inset-0 bg-zinc-950/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-zinc-200 overflow-hidden transform transition-all">
+            <div class="px-6 py-4 bg-zinc-900 text-white flex justify-between items-center">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-camera-retro text-zinc-300"></i>
+                    <h3 class="font-bold text-zinc-100">自主練習打卡發表</h3>
+                </div>
+                <button onclick="closePracticeModal()" class="text-zinc-400 hover:text-white text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <form id="form-practice" onsubmit="handlePracticeSubmit(event)" class="p-6 space-y-4">
+                <!-- Current Member Posting -->
+                <div class="bg-zinc-100 p-3 rounded-xl border border-zinc-200 flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                        <span class="text-xs font-semibold text-zinc-600">發文身份：</span>
+                        <span id="practice-poster-name" class="font-bold text-sm text-zinc-900"></span>
+                    </div>
+                    <span id="practice-poster-role" class="text-xxs px-2 py-0.5 rounded font-bold"></span>
+                </div>
+
+                <!-- Public visibility toggle -->
+                <div class="flex items-center justify-between p-3 bg-zinc-50 rounded-xl border border-zinc-200">
+                    <div>
+                        <p class="text-xs font-bold text-zinc-800">公開發布至 Dcard 社團練習牆</p>
+                        <p class="text-xxs text-zinc-500">關閉後僅有您自己能看到此筆打卡</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="practice-is-public" class="sr-only peer" checked>
+                        <div class="w-11 h-6 bg-zinc-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-zinc-900"></div>
+                    </label>
+                </div>
+
+                <!-- Date & Time -->
+                <div>
+                    <label class="block text-xs font-semibold text-zinc-600 uppercase mb-1">練習時間 <span class="text-zinc-900">*</span></label>
+                    <input type="datetime-local" id="practice-datetime" required class="w-full px-3.5 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-900/20">
+                </div>
+
+                <!-- Location -->
+                <div>
+                    <label class="block text-xs font-semibold text-zinc-600 uppercase mb-1">練習地點 <span class="text-zinc-900">*</span></label>
+                    <div class="flex gap-2">
+                        <input type="text" id="practice-location" required placeholder="例如: 體育館 3 樓舞房 / 綜合大樓 201" class="flex-grow px-3.5 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-900/20">
+                        <button type="button" onclick="getCurrentLocation()" class="px-3 py-2 bg-zinc-900 hover:bg-black text-white rounded-xl text-xs font-semibold transition-all flex items-center shrink-0">
+                            <i class="fa-solid fa-crosshairs mr-1"></i>GPS定位
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Photo Upload / Preview -->
+                <div>
+                    <label class="block text-xs font-semibold text-zinc-600 uppercase mb-1">練習現場照片 <span class="text-zinc-900">*</span></label>
+                    <div class="mt-1 flex justify-center px-6 pt-4 pb-4 border-2 border-zinc-200 border-dashed rounded-2xl relative bg-zinc-50/50 hover:bg-zinc-50 transition-all">
+                        <div class="space-y-1 text-center" id="photo-placeholder">
+                            <i class="fa-solid fa-cloud-arrow-up text-3xl text-zinc-400"></i>
+                            <div class="flex text-xs text-zinc-600 justify-center">
+                                <label for="practice-photo-file" class="relative cursor-pointer font-semibold text-zinc-900 hover:underline focus-within:outline-none">
+                                    <span>上傳照片或拍攝</span>
+                                    <input id="practice-photo-file" name="practice-photo-file" type="file" accept="image/*" class="sr-only" onchange="previewPhoto(event)">
+                                </label>
+                            </div>
+                            <p class="text-xxs text-zinc-400">支援 JPG, PNG 圖片格式</p>
+                        </div>
+                        <div id="photo-preview-container" class="hidden w-full relative">
+                            <img id="photo-preview" src="" alt="預覽照片" class="max-h-48 rounded-xl mx-auto object-cover border border-zinc-200 shadow-sm">
+                            <button type="button" onclick="clearPhotoPreview()" class="absolute top-1 right-1 bg-zinc-900 text-white rounded-full p-1.5 shadow-md hover:bg-black transition-all">
+                                <i class="fa-solid fa-trash text-xs"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Notes -->
+                <div>
+                    <label class="block text-xs font-semibold text-zinc-600 uppercase mb-1">心得與練習內容</label>
+                    <textarea id="practice-notes" rows="2" placeholder="撰寫今日自主練習心得，交流技藝..." class="w-full px-3.5 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-900/20"></textarea>
+                </div>
+
+                <div class="pt-2 flex justify-end space-x-2">
+                    <button type="button" onclick="closePracticeModal()" class="px-4 py-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-sm font-medium rounded-xl transition-all border border-zinc-200">取消</button>
+                    <button type="submit" class="px-5 py-2 bg-zinc-900 hover:bg-black text-white text-sm font-semibold rounded-xl shadow-sm transition-all">發布打卡</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Notification Toast Container -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+    <script>
+       const sb = supabase.createClient('https://ojoharpeifmawtsldviw.supabase.co/rest/v1/', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9qb2hhcnBlaWZtYXd0c2xkdml3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEzNDA1MjksImV4cCI6MjEwNjkxNjUyOX0.g1jFw-8Vyl_y1pu1o8y7IeilsbVyUA-CIuvDCpQbm5o');
+
+        let members = [];
+        let practices = [];
+        let attendanceReqs = [];
+        let currentUser = null;
+        let currentTab = 'dashboard';
+        let activePracticeSubTab = 'public';
+        let currentUploadedPhotoBase64 = '';
+        let feeChartInstance = null;
+        let nationalityChartInstance = null;
+
+        // --- STREAMING_CHUNK:Initializing application state on DOM load... ---
+        function saveData() {}   // 暫時留空，避免舊程式呼叫時出錯
+
+            let appReady = false;
+            
+            async function handleLogin(e) {
+              e.preventDefault();
+              const { error } = await sb.auth.signInWithPassword({
+                email: document.getElementById('login-email').value,
+                password: document.getElementById('login-password').value
+              });
+              if (error) return showToast('登入失敗：' + error.message, 'error');
+              await bootApp();
+            }
+            
+            async function bootApp() {
+              const { data: { user } } = await sb.auth.getUser();
+              if (!user) return;
+              const { data: p, error } = await sb.from('profiles').select('*').eq('id', user.id).single();
+              if (error || !p) return showToast('找不到個人資料', 'error');
+            
+              currentUser = { id: p.id, name: p.name, role: p.role, studentId: p.student_id,
+                              nationality: p.nationality, dept: p.dept, feePaid: p.fee_paid, attendance: 0 };
+            
+              document.getElementById('login-screen').classList.add('hidden');
+              if (!appReady) {
+                document.getElementById('rollcall-date').valueAsDate = new Date();
+                initCharts();
+                appReady = true;
+              }
+            
+              if (currentUser.role === 'OFFICER') await loadMembers(); else members = [currentUser];
+              await loadAttendance();
+              await loadPractices();
+            
+              updateUserBadgeUI();
+              renderNavigation();
+              switchTab(currentUser.role === 'OFFICER' ? 'dashboard' : 'attendance');
+            }
+            
+            async function logout() { await sb.auth.signOut(); location.reload(); }
+            
+            async function loadMembers() {
+              const { data } = await sb.from('profiles').select('*');
+              members = (data || []).map(m => ({ id: m.id, name: m.name, role: m.role, studentId: m.student_id || '',
+                nationality: m.nationality || '', dept: m.dept || '', feePaid: m.fee_paid, attendance: 0 }));
+            }
+            
+            async function loadAttendance() {
+              const { data } = await sb.from('attendance_reqs').select('*');
+              const nameOf = id => (members.find(m => m.id === id) || {}).name || '';
+              attendanceReqs = (data || []).map(r => ({ id: r.id, date: r.date, memberId: r.member_id,
+                memberName: nameOf(r.member_id), status: r.status, time: '' }));
+              const count = id => attendanceReqs.filter(r => r.memberId === id && r.status === 'CONFIRMED').length;
+              members.forEach(m => m.attendance = count(m.id));
+              currentUser.attendance = count(currentUser.id);
+            }
+            
+            async function loadPractices() {
+              const { data } = await sb.from('practices').select('*').order('practiced_at', { ascending: false });
+              practices = (data || []).map(p => ({ id: p.id, memberId: p.member_id, memberName: p.member_name,
+                role: p.member_role, dept: p.dept, datetime: p.practiced_at, location: p.location,
+                photo: p.photo_url, notes: p.notes, isPublic: p.is_public, likes: p.likes || 0, comments: [] }));
+            }
+            
+            window.addEventListener('DOMContentLoaded', bootApp);
+                    // --- IDENTITY & ROLE MANAGEMENT ---
+                    function updateUserBadgeUI() {
+                        document.getElementById('user-avatar').innerText = currentUser.name.charAt(0);
+                        document.getElementById('user-display-name').innerText = currentUser.name;
+                        
+                        const badge = document.getElementById('user-role-badge');
+                        if (currentUser.role === 'OFFICER') {
+                            badge.className = "inline-block text-xxs px-1.5 py-0.2 rounded font-bold bg-zinc-900 text-white border border-zinc-900";
+                            badge.innerText = "幹部";
+                        } else {
+                            badge.className = "inline-block text-xxs px-1.5 py-0.2 rounded font-bold bg-zinc-200 text-zinc-700 border border-zinc-300";
+                            badge.innerText = "社員";
+                        }
+                    }
+
+        
+        // --- NAVIGATION CONTROLLER ---
+        function renderNavigation() {
+            const dnav = document.getElementById('desktop-nav');
+            const mnav = document.getElementById('mobile-nav');
+
+            const isOfficer = currentUser.role === 'OFFICER';
+
+            let desktopHTML = '';
+            if (isOfficer) {
+                desktopHTML += `
+                    <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-btn px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all">
+                        <i class="fa-solid fa-chart-pie mr-1.5"></i>行政總覽
+                    </button>
+                    <button onclick="switchTab('members')" id="nav-members" class="nav-btn px-3.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 transition-all">
+                        <i class="fa-solid fa-id-card mr-1.5"></i>社員名冊與社費
+                    </button>
+                `;
+            }
+
+            desktopHTML += `
+                <button onclick="switchTab('attendance')" id="nav-attendance" class="nav-btn px-3.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 transition-all">
+                    <i class="fa-solid fa-calendar-check mr-1.5"></i>${isOfficer ? '團練出席審核' : '團練簽到點名'}
+                </button>
+                <button onclick="switchTab('practice')" id="nav-practice" class="nav-btn px-3.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 transition-all">
+                    <i class="fa-solid fa-fire mr-1.5 text-sky-500"></i>Dcard 練習交流牆
+                </button>
+            `;
+            dnav.innerHTML = desktopHTML;
+
+            let mobileHTML = '';
+            if (isOfficer) {
+                mobileHTML += `
+                    <button onclick="switchTab('dashboard')" id="mnav-dashboard" class="flex flex-col items-center py-1">
+                        <i class="fa-solid fa-chart-pie text-base mb-0.5"></i>總覽
+                    </button>
+                    <button onclick="switchTab('members')" id="mnav-members" class="flex flex-col items-center py-1">
+                        <i class="fa-solid fa-id-card text-base mb-0.5"></i>社員
+                    </button>
+                `;
+            }
+            mobileHTML += `
+                <button onclick="switchTab('attendance')" id="mnav-attendance" class="flex flex-col items-center py-1">
+                    <i class="fa-solid fa-calendar-check text-base mb-0.5"></i>簽到點名
+                </button>
+                <button onclick="switchTab('practice')" id="mnav-practice" class="flex flex-col items-center py-1">
+                    <i class="fa-solid fa-fire text-base mb-0.5 text-sky-500"></i>Dcard牆
+                </button>
+            `;
+            mnav.innerHTML = mobileHTML;
+        }
+
+        function switchTab(tabName) {
+            if (currentUser.role !== 'OFFICER' && (tabName === 'dashboard' || tabName === 'members')) {
+                showToast('「行政總覽」與「社員名冊」為幹部專屬存取權限', 'warning');
+                tabName = 'attendance';
+            }
+
+            currentTab = tabName;
+
+            ['dashboard', 'members', 'attendance', 'practice'].forEach(v => {
+                const el = document.getElementById(`view-${v}`);
+                if (el) el.classList.add('hidden');
+            });
+
+            const activeEl = document.getElementById(`view-${tabName}`);
+            if (activeEl) activeEl.classList.remove('hidden');
+
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('bg-zinc-900', 'text-white', 'shadow-sm', 'font-semibold');
+                btn.classList.add('text-zinc-600', 'font-medium');
+            });
+            const activeNav = document.getElementById(`nav-${tabName}`);
+            if (activeNav) {
+                activeNav.classList.add('bg-zinc-900', 'text-white', 'shadow-sm', 'font-semibold');
+                activeNav.classList.remove('text-zinc-600', 'font-medium');
+            }
+
+            document.querySelectorAll('[id^="mnav-"]').forEach(mbtn => {
+                mbtn.classList.remove('text-zinc-900', 'font-semibold');
+            });
+            const activeMobileNav = document.getElementById(`mnav-${tabName}`);
+            if (activeMobileNav) {
+                activeMobileNav.classList.add('text-zinc-900', 'font-semibold');
+            }
+
+            if (tabName === 'dashboard') {
+                updateDashboard();
+            } else if (tabName === 'members') {
+                renderMembersTable();
+            } else if (tabName === 'attendance') {
+                renderAttendanceView();
+            } else if (tabName === 'practice') {
+                renderPracticeFeed();
+            }
+        }
+
+        // --- STREAMING_CHUNK:Implementing Member Roster management and table rendering... ---
+        // --- MEMBER ROSTER & FEES MANAGEMENT ---
+        function renderMembersTable() {
+            const tbody = document.getElementById('members-table-body');
+            const searchVal = document.getElementById('member-search').value.toLowerCase().trim();
+            const feeVal = document.getElementById('fee-filter').value;
+
+            tbody.innerHTML = '';
+
+            let filtered = members.filter(m => {
+                const matchesSearch = m.name.toLowerCase().includes(searchVal) || 
+                                      m.studentId.toLowerCase().includes(searchVal) || 
+                                      m.nationality.toLowerCase().includes(searchVal);
+                
+                let matchesFee = true;
+                if (feeVal === 'PAID') matchesFee = m.feePaid === true;
+                if (feeVal === 'UNPAID') matchesFee = m.feePaid === false;
+
+                return matchesSearch && matchesFee;
+            });
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="py-8 text-center text-zinc-400">
+                            <i class="fa-solid fa-users-slash text-2xl mb-2"></i>
+                            <p>找不到符合條件的社員資料</p>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            filtered.forEach(m => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-zinc-50 transition-colors border-b border-zinc-100";
+
+                const isOfficer = m.role === 'OFFICER';
+                const roleBadge = isOfficer
+                    ? `<span class="px-2 py-0.5 rounded text-xxs font-bold bg-zinc-900 text-white">幹部</span>`
+                    : `<span class="px-2 py-0.5 rounded text-xxs font-medium bg-zinc-100 text-zinc-600 border border-zinc-200">社員</span>`;
+
+                const feeBadge = m.feePaid
+                    ? `<span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-zinc-900 text-white flex items-center w-fit"><i class="fa-solid fa-circle-check mr-1 text-xs"></i>已繳交</span>`
+                    : `<span class="px-2.5 py-1 rounded-full text-xs font-medium bg-zinc-100 text-zinc-500 border border-zinc-300 flex items-center w-fit"><i class="fa-solid fa-circle-xmark mr-1 text-xs"></i>未繳交</span>`;
+
+                tr.innerHTML = `
+                    <td class="py-3.5 px-4">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-8 h-8 rounded-full ${isOfficer ? 'bg-zinc-900' : 'bg-zinc-700'} text-white font-bold flex items-center justify-center text-xs shadow-sm">
+                                ${m.name.charAt(0)}
+                            </div>
+                            <div>
+                                <div class="font-bold text-zinc-900">${m.name}</div>
+                                <div class="mt-0.5">${roleBadge}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="py-3.5 px-4 font-mono text-zinc-600">${m.studentId}</td>
+                    <td class="py-3.5 px-4">
+                        <span class="px-2 py-0.5 rounded bg-zinc-100 text-zinc-700 text-xs font-medium border border-zinc-200">${m.nationality}</span>
+                    </td>
+                    <td class="py-3.5 px-4 text-zinc-500">${m.dept || '-'}</td>
+                    <td class="py-3.5 px-4">${feeBadge}</td>
+                    <td class="py-3.5 px-4">
+                        <span class="font-bold text-zinc-900">${m.attendance || 0}</span> <span class="text-xs text-zinc-400">次</span>
+                    </td>
+                    <td class="py-3.5 px-4 text-right space-x-1">
+                        <button onclick="editMember('${m.id}')" class="p-1.5 text-zinc-400 hover:text-zinc-900 transition-colors" title="編輯社員">
+                            <i class="fa-solid fa-pen-to-square"></i>
+                        </button>
+                        <button onclick="deleteMember('${m.id}')" class="p-1.5 text-zinc-400 hover:text-zinc-900 transition-colors" title="刪除社員">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function openMemberModal(memberData = null) {
+            const form = document.getElementById('form-member');
+            form.reset();
+
+            if (memberData) {
+                document.getElementById('modal-member-title').innerText = "編輯社員資料";
+                document.getElementById('member-id').value = memberData.id;
+                document.getElementById('input-name').value = memberData.name;
+                document.getElementById('input-student-id').value = memberData.studentId;
+                document.getElementById('input-nationality').value = memberData.nationality;
+                document.getElementById('input-role').value = memberData.role;
+                document.getElementById('input-dept').value = memberData.dept || '';
+                document.getElementById('input-fee-paid').value = memberData.feePaid ? 'true' : 'false';
+                document.getElementById('input-attendance').value = memberData.attendance || 0;
+            } else {
+                document.getElementById('modal-member-title').innerText = "新增社團成員";
+                document.getElementById('member-id').value = '';
+            }
+
+            document.getElementById('modal-member').classList.remove('hidden');
+        }
+
+        function closeMemberModal() {
+            document.getElementById('modal-member').classList.add('hidden');
+        }
+
+        function editMember(id) {
+            const target = members.find(m => m.id === id);
+            if (target) openMemberModal(target);
+        }
+
+        function deleteMember(id) {
+            const target = members.find(m => m.id === id);
+            if (!target) return;
+
+            if (confirm(`確定要刪除社員「${target.name}」嗎？此操作無法復原。`)) {
+                members = members.filter(m => m.id !== id);
+                saveData();
+                renderMembersTable();
+                updateDashboard();
+                showToast(`已成功刪除社員 ${target.name}`, 'info');
+            }
+        }
+
+           async function handleMemberSubmit(e) {
+                e.preventDefault();
+                const id = document.getElementById('member-id').value;
+                if (!id) return showToast('新社員請到 Supabase 後台建立帳號', 'warning');
+              
+                const { error } = await sb.from('profiles').update({
+                  name: document.getElementById('input-name').value.trim(),
+                  student_id: document.getElementById('input-student-id').value.trim(),
+                  nationality: document.getElementById('input-nationality').value.trim(),
+                  role: document.getElementById('input-role').value,
+                  dept: document.getElementById('input-dept').value.trim(),
+                  fee_paid: document.getElementById('input-fee-paid').value === 'true'
+                }).eq('id', id);
+                if (error) return showToast('儲存失敗：' + error.message, 'error');
+              
+                closeMemberModal();
+                await loadMembers();
+                await loadAttendance();
+                renderMembersTable();
+                updateDashboard();
+                showToast('社員資料已儲存成功！', 'success');
+        }
+
+        function exportCSV() {
+            let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+            csvContent += "姓名,學號,國籍,社團職務,系級備註,社費繳交,累積出席次數\n";
+
+            members.forEach(m => {
+                const roleStr = m.role === 'OFFICER' ? '幹部' : '社員';
+                const feeStr = m.feePaid ? '已繳交' : '未繳交';
+                csvContent += `"${m.name}","${m.studentId}","${m.nationality}","${roleStr}","${m.dept || ''}","${feeStr}",${m.attendance || 0}\n`;
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `社團成員名冊_${new Date().toISOString().slice(0,10)}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showToast('已開始下載 CSV 社員名冊！', 'success');
+        }
+
+        // --- STREAMING_CHUNK:Implementing attendance review logic and role views... ---
+        // --- ATTENDANCE SYSTEM ---
+        function renderAttendanceView() {
+            const dateVal = document.getElementById('rollcall-date').value;
+            const container = document.getElementById('attendance-content-area');
+            const titleEl = document.getElementById('attendance-view-title');
+            const descEl = document.getElementById('attendance-view-desc');
+
+            container.innerHTML = '';
+
+            if (currentUser.role === 'OFFICER') {
+                titleEl.innerText = '團練簽到審核面板 (幹部權限)';
+                descEl.innerText = `正在審核 ${dateVal} 的團練出席申請；核准後自動累加社員出席計數。`;
+
+                const reqsForDate = attendanceReqs.filter(r => r.date === dateVal);
+
+                let html = `
+                    <div class="space-y-4">
+                        <div class="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-200">
+                            <span class="text-xs font-semibold text-slate-700">該日收到 ${reqsForDate.length} 筆社員簽到申請</span>
+                            <button onclick="approveAllPending('${dateVal}')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition-all flex items-center">
+                                <i class="fa-solid fa-check-double mr-1"></i>一鍵全選審核通過
+                            </button>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                `;
+
+                members.forEach(m => {
+                    const req = reqsForDate.find(r => r.memberId === m.id);
+                    const isConfirmed = req && req.status === 'CONFIRMED';
+                    const isPending = req && req.status === 'PENDING';
+
+                    html += `
+                        <div class="p-4 rounded-2xl border flex items-center justify-between ${
+                            isConfirmed ? 'bg-emerald-50/70 border-emerald-300' : (isPending ? 'bg-amber-50/70 border-amber-300' : 'bg-slate-50 border-slate-200')
+                        }">
+                            <div>
+                                <div class="font-bold text-sm text-slate-800 flex items-center">
+                                    ${m.name}
+                                    <span class="ml-1.5 text-xxs px-1.5 py-0.2 rounded font-bold ${m.role === 'OFFICER' ? 'bg-amber-100 text-amber-800' : 'bg-slate-200 text-slate-600'}">
+                                        ${m.role === 'OFFICER' ? '幹部' : '社員'}
+                                    </span>
+                                </div>
+                                <div class="text-xs text-slate-400 font-mono">${m.studentId}</div>
+                                <div class="text-xs mt-1 text-slate-500">已累積出席: ${m.attendance} 次</div>
+                            </div>
+
+                            <div>
+                                ${isConfirmed ? `
+                                    <span class="px-2.5 py-1 bg-emerald-600 text-white rounded-lg text-xs font-semibold flex items-center">
+                                        <i class="fa-solid fa-circle-check mr-1"></i>已核准
+                                    </span>
+                                ` : (isPending ? `
+                                    <button onclick="confirmSingleAttendance('${req.id}')" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-semibold shadow-sm transition-all flex items-center">
+                                        <i class="fa-solid fa-clock mr-1"></i>核准簽到
+                                    </button>
+                                ` : `
+                                    <button onclick="officerForceCheckin('${m.id}', '${dateVal}')" class="px-2.5 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-semibold transition-all">
+                                        代補簽到
+                                    </button>
+                                `)}
+                            </div>
+                        </div>
+                    `;
+                });
+
+                html += `</div></div>`;
+                container.innerHTML = html;
+
+            } else {
+                titleEl.innerText = '團練出席自主簽到';
+                descEl.innerText = `選擇日期勾選「自主簽到」，送出後將由幹部進行審核確認。`;
+
+                const myReq = attendanceReqs.find(r => r.date === dateVal && r.memberId === currentUser.id);
+
+                let statusBadge = `<span class="px-3 py-1 bg-slate-100 text-slate-600 rounded-xl text-xs font-medium">尚未簽到</span>`;
+                if (myReq) {
+                    if (myReq.status === 'CONFIRMED') {
+                        statusBadge = `<span class="px-3 py-1 bg-emerald-100 text-emerald-700 border border-emerald-300 rounded-xl text-xs font-bold"><i class="fa-solid fa-circle-check mr-1"></i>幹部已核准出席</span>`;
+                    } else {
+                        statusBadge = `<span class="px-3 py-1 bg-amber-100 text-amber-800 border border-amber-300 rounded-xl text-xs font-bold"><i class="fa-solid fa-hourglass-half mr-1"></i>已簽到，待幹部確認</span>`;
+                    }
+                }
+
+                container.innerHTML = `
+                    <div class="max-w-md mx-auto text-center p-6 bg-slate-50/60 rounded-2xl border border-slate-200/80 space-y-4">
+                        <div class="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-2xl mx-auto flex items-center justify-center text-2xl shadow-inner">
+                            <i class="fa-solid fa-user-check"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-slate-800 text-lg">${currentUser.name} (${currentUser.dept || '社員'})</h4>
+                            <p class="text-xs text-slate-500 font-mono">學號: ${currentUser.studentId} ‧ 目前總出席: ${currentUser.attendance} 次</p>
+                        </div>
+
+                        <div class="py-2">${statusBadge}</div>
+
+                        ${!myReq ? `
+                            <button onclick="submitSelfAttendance('${dateVal}')" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl shadow-lg shadow-indigo-100 transition-all flex items-center justify-center">
+                                <i class="fa-solid fa-pen-to-square mr-2"></i>勾選完成 ${dateVal} 團練簽到
+                            </button>
+                        ` : `
+                            <p class="text-xs text-slate-400">已於今日發送簽到紀錄，等待幹部審核完成。</p>
+                        `}
+                    </div>
+                `;
+            }
+        }
+
+      async function submitSelfAttendance(date) {
+        const { error } = await sb.from('attendance_reqs').insert({ date, member_id: currentUser.id });
+        if (error) return showToast('你這天已經簽到過了', 'warning');
+        await loadAttendance();
+        renderAttendanceView();
+        showToast('已完成自主簽到！待幹部審核', 'success');
+       }
+
+        async function confirmSingleAttendance(reqId) {
+              const { error } = await sb.from('attendance_reqs').update({ status: 'CONFIRMED' }).eq('id', reqId);
+              if (error) return showToast('沒有權限', 'error');
+              await loadAttendance();
+              renderAttendanceView();
+              updateDashboard();
+              showToast('已核准出席', 'success');
+        }
+      
+        async function approveAllPending(date) {
+                  const { error } = await sb.from('attendance_reqs')
+            .update({ status: 'CONFIRMED' })
+            .eq('date', date)
+            .eq('status', 'PENDING');
+          if (error) return showToast('沒有權限', 'error');
+          await loadAttendance();
+          renderAttendanceView();
+          updateDashboard();
+          showToast('一鍵審核完成！', 'success');
+       }
+      
+        async function officerForceCheckin(memberId, date) {
+            const { error } = await sb.from('attendance_reqs')
+              .insert({ date, member_id: memberId, status: 'CONFIRMED' });
+            if (error) return showToast('補簽失敗：' + error.message, 'error');
+            await loadAttendance();
+            renderAttendanceView();
+            updateDashboard();
+            showToast('已完成幹部補簽', 'info');
+        }
+      
+        // --- STREAMING_CHUNK:Implementing Dcard Practice Community Feed... ---
+        // --- DCARD PRACTICE COMMUNITY WALL ---
+        function switchPracticeSubTab(tab) {
+            activePracticeSubTab = tab;
+            document.getElementById('ptab-public').className = tab === 'public' 
+                ? "px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all bg-zinc-900 text-white shadow-sm"
+                : "px-3.5 py-1.5 rounded-lg text-xs font-semibold text-zinc-600 transition-all";
+
+            document.getElementById('ptab-mine').className = tab === 'mine' 
+                ? "px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all bg-zinc-900 text-white shadow-sm"
+                : "px-3.5 py-1.5 rounded-lg text-xs font-semibold text-zinc-600 transition-all";
+
+            renderPracticeFeed();
+        }
+
+        function renderPracticeFeed() {
+            const grid = document.getElementById('practice-feed-grid');
+            grid.innerHTML = '';
+
+            let list = practices;
+            if (activePracticeSubTab === 'public') {
+                list = practices.filter(p => p.isPublic !== false);
+            } else {
+                list = practices.filter(p => p.memberId === currentUser.id);
+            }
+
+            if (list.length === 0) {
+                grid.innerHTML = `
+                    <div class="bg-white rounded-2xl p-8 text-center text-zinc-400 border border-zinc-200">
+                        <i class="fa-solid fa-fire-flame-curved text-4xl mb-3 text-zinc-300"></i>
+                        <p class="text-sm font-medium">尚無練習打卡文章。</p>
+                        <button onclick="openPracticeModal()" class="mt-3 text-xs font-bold text-zinc-900 underline hover:text-black">
+                            發布第一篇自主練習打卡 &rarr;
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+
+            list.forEach(p => {
+                const card = document.createElement('div');
+                card.className = "bg-white rounded-xl border border-zinc-200 p-4 flex gap-4 hover:bg-zinc-50 transition cursor-pointer";
+              
+                const isOfficer = p.role === 'OFFICER';
+                const roleBadge = isOfficer 
+                    ? `<span class="bg-zinc-900 text-white text-xxs px-1.5 py-0.2 rounded font-bold">幹部</span>`
+                    : `<span class="bg-zinc-100 text-zinc-600 border border-zinc-200 text-xxs px-1.5 py-0.2 rounded font-medium">社員</span>`;
+
+                const formattedTime = new Date(p.datetime).toLocaleString('zh-TW', {
+                    month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                });
+
+                card.innerHTML = `
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-1.5 text-xs text-zinc-500 mb-1.5">
+                      <span class="font-semibold text-zinc-800">${p.memberName}</span>
+                      ${roleBadge}
+                      <span>· ${p.dept || ''} · ${formattedTime}</span>
+                      ${p.memberId === currentUser.id || currentUser.role === 'OFFICER' ? `<button onclick="event.stopPropagation(); deletePractice('${p.id}')" class="ml-auto text-zinc-300 hover:text-zinc-900"><i class="fa-solid fa-trash-can"></i></button>` : ''}
+                    </div>
+                    <h4 class="font-bold text-zinc-900 text-base line-clamp-1">
+                      ${(p.notes || '今日練習打卡').split('\n')[0]}
+                    </h4>
+                    <p class="text-sm text-zinc-500 line-clamp-2 mt-1">${p.notes || ''}</p>
+                    <div class="flex items-center gap-4 mt-3 text-xs text-zinc-400">
+                      <span><i class="fa-solid fa-location-dot"></i> ${p.location}</span>
+                      <button onclick="event.stopPropagation(); likePractice('${p.id}')">
+                        <i class="fa-solid fa-heart"></i> ${p.likes || 0}
+                      </button>
+                      <span><i class="fa-regular fa-comment"></i> ${p.comments?.length || 0}</span>
+                    </div>
+                  </div>
+                  ${p.photo ? `<img src="${p.photo}" class="w-24 h-24 object-cover rounded-lg shrink-0">` : ''}
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function likePractice(id) {
+            const p = practices.find(x => x.id === id);
+            if (p) {
+                p.likes = (p.likes || 0) + 1;
+                saveData();
+                renderPracticeFeed();
+            }
+        }
+
+       async function deletePractice(id) {
+          if (!confirm('確定要刪除這篇打卡紀錄嗎？')) return;
+          const { error } = await sb.from('practices').delete().eq('id', id);
+          if (error) return showToast('沒有權限刪除', 'error');
+          await loadPractices();
+          renderPracticeFeed();
+        }
+
+        function openPracticeModal() {
+            document.getElementById('practice-poster-name').innerText = currentUser.name;
+            const roleEl = document.getElementById('practice-poster-role');
+            if (currentUser.role === 'OFFICER') {
+                roleEl.className = "text-xxs px-2 py-0.5 rounded font-bold bg-amber-100 text-amber-800";
+                roleEl.innerText = "幹部";
+            } else {
+                roleEl.className = "text-xxs px-2 py-0.5 rounded font-bold bg-slate-200 text-slate-700";
+                roleEl.innerText = "社員";
+            }
+
+            const now = new Date();
+            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+            document.getElementById('practice-datetime').value = now.toISOString().slice(0, 16);
+
+            document.getElementById('form-practice').reset();
+            document.getElementById('practice-is-public').checked = true;
+            clearPhotoPreview();
+
+            document.getElementById('modal-practice').classList.remove('hidden');
+        }
+
+        function closePracticeModal() {
+            document.getElementById('modal-practice').classList.add('hidden');
+        }
+
+        function getCurrentLocation() {
+            if ("geolocation" in navigator) {
+                showToast('正在進行 GPS 定位中...', 'info');
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const lat = position.coords.latitude.toFixed(4);
+                        const lng = position.coords.longitude.toFixed(4);
+                        document.getElementById('practice-location').value = `校園綜合場館 (GPS: ${lat}, ${lng})`;
+                        showToast('成功取得目前 GPS 位置！', 'success');
+                    },
+                    () => {
+                        document.getElementById('practice-location').value = "學生活動中心 / 體育館場地";
+                        showToast('預設定位完成（未能取得精準 GPS）', 'info');
+                    }
+                );
+            } else {
+                showToast('您的裝置不支援地理定位', 'warning');
+            }
+        }
+
+        function previewPhoto(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    currentUploadedPhotoBase64 = e.target.result;
+                    document.getElementById('photo-preview').src = e.target.result;
+                    document.getElementById('photo-placeholder').classList.add('hidden');
+                    document.getElementById('photo-preview-container').classList.remove('hidden');
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function clearPhotoPreview() {
+            currentUploadedPhotoBase64 = '';
+            document.getElementById('photo-preview').src = '';
+            document.getElementById('practice-photo-file').value = '';
+            document.getElementById('photo-placeholder').classList.remove('hidden');
+            document.getElementById('photo-preview-container').classList.add('hidden');
+        }
+
+          async function handlePracticeSubmit(e) {
+              e.preventDefault();
+              const file = document.getElementById('practice-photo-file').files[0];
+              if (!file) return showToast('請上傳或拍攝一張現場練習照片', 'warning');
+            
+              const path = `${currentUser.id}/${Date.now()}.jpg`;
+              const up = await sb.storage.from('practice-photos').upload(path, file);
+              if (up.error) return showToast('照片上傳失敗：' + up.error.message, 'error');
+              const { data: pub } = sb.storage.from('practice-photos').getPublicUrl(path);
+            
+              const { error } = await sb.from('practices').insert({
+                member_id: currentUser.id,
+                member_name: currentUser.name,
+                member_role: currentUser.role,
+                dept: currentUser.dept,
+                practiced_at: document.getElementById('practice-datetime').value,
+                location: document.getElementById('practice-location').value.trim(),
+                photo_url: pub.publicUrl,
+                notes: document.getElementById('practice-notes').value.trim(),
+                is_public: document.getElementById('practice-is-public').checked
+              });
+              if (error) return showToast('發布失敗：' + error.message, 'error');
+            
+              closePracticeModal();
+              await loadPractices();
+              renderPracticeFeed();
+              showToast('打卡文章已成功發表！', 'success');
+         }
+        // --- STREAMING_CHUNK:Implementing Officer Analytics Dashboard & Chart.js integration... ---
+        // --- DASHBOARD FOR OFFICERS ---
+        function updateDashboard() {
+            if (currentUser.role !== 'OFFICER') return;
+
+            document.getElementById('stat-total-members').innerText = `${members.length} 人`;
+
+            const paidCount = members.filter(m => m.feePaid).length;
+            const feeRate = members.length > 0 ? Math.round((paidCount / members.length) * 100) : 0;
+            document.getElementById('stat-fee-rate').innerText = `${feeRate}%`;
+
+            const totalAttendance = members.reduce((sum, m) => sum + (m.attendance || 0), 0);
+            const avgAttendance = members.length > 0 ? (totalAttendance / members.length).toFixed(1) : 0;
+            document.getElementById('stat-avg-attendance').innerText = `${avgAttendance} 次`;
+
+            document.getElementById('stat-total-practices').innerText = `${practices.length} 次`;
+
+            // Dashboard Pending List
+            const pendingList = document.getElementById('dashboard-pending-attendance');
+            pendingList.innerHTML = '';
+            
+            const pendingReqs = attendanceReqs.filter(r => r.status === 'PENDING');
+            if (pendingReqs.length === 0) {
+                pendingList.innerHTML = `<p class="text-xs text-slate-400 text-center py-4">目前沒有待審核的社員簽到</p>`;
+            } else {
+                pendingReqs.forEach(r => {
+                    const item = document.createElement('div');
+                    item.className = "flex items-center justify-between p-2 rounded-xl bg-amber-50 border border-amber-200 text-xs";
+                    item.innerHTML = `
+                        <div>
+                            <span class="font-bold text-slate-800">${r.memberName}</span>
+                            <span class="text-xxs text-slate-400 ml-1">(${r.date})</span>
+                        </div>
+                        <button onclick="confirmSingleAttendance('${r.id}')" class="px-2 py-0.5 bg-amber-500 hover:bg-amber-600 text-white rounded text-xxs font-bold">
+                            核准
+                        </button>
+                    `;
+                    pendingList.appendChild(item);
+                });
+            }
+
+            updateChartsData(paidCount, members.length - paidCount);
+        }
+        // --- STREAMING_CHUNK:Updating Chart.js colors to monochrome black and white palette... ---
+        function initCharts() {
+            const ctxFee = document.getElementById('feeChart').getContext('2d');
+            feeChartInstance = new Chart(ctxFee, {
+                type: 'doughnut',
+                data: {
+                    labels: ['已繳交', '未繳交'],
+                    datasets: [{
+                        data: [0, 0],
+                        backgroundColor: ['#18181b', '#e4e4e7'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 }, color: '#27272a' } }
+                    },
+                    cutout: '70%'
+                }
+            });
+
+            const ctxNat = document.getElementById('nationalityChart').getContext('2d');
+            nationalityChartInstance = new Chart(ctxNat, {
+                type: 'pie',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        data: [],
+                        backgroundColor: ['#09090b', '#3f3f46', '#71717a', '#a1a1aa', '#e4e4e7'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 }, color: '#27272a' } }
+                    }
+                }
+            });
+        }
+
+        function updateChartsData(paid, unpaid) {
+            if (feeChartInstance) {
+                feeChartInstance.data.datasets[0].data = [paid, unpaid];
+                feeChartInstance.update();
+            }
+
+            if (nationalityChartInstance) {
+                const counts = {};
+                members.forEach(m => {
+                    const nat = m.nationality || '未填寫';
+                    counts[nat] = (counts[nat] || 0) + 1;
+                });
+
+                nationalityChartInstance.data.labels = Object.keys(counts);
+                nationalityChartInstance.data.datasets[0].data = Object.values(counts);
+                nationalityChartInstance.update();
+            }
+        }
+
+        // --- TOAST NOTIFICATIONS ---
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            const bgColors = {
+                success: 'bg-zinc-900 text-white border-zinc-800',
+                warning: 'bg-zinc-800 text-white border-zinc-700',
+                info: 'bg-zinc-900 text-white border-zinc-800',
+                error: 'bg-black text-white border-zinc-800'
+            };
+
+            const icons = {
+                success: 'fa-circle-check',
+                warning: 'fa-triangle-exclamation',
+                info: 'fa-circle-info',
+                error: 'fa-circle-xmark'
+            };
+
+            toast.className = `${bgColors[type] || 'bg-zinc-900 text-white'} border text-xs font-semibold px-4 py-3 rounded-xl shadow-xl flex items-center space-x-2 transition-all transform translate-y-2 opacity-0 pointer-events-auto`;
+            toast.innerHTML = `<i class="fa-solid ${icons[type]} text-sm"></i><span>${message}</span>`;
+
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            }, 10);
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
