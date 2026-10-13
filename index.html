@@ -637,7 +637,7 @@
               const { data } = await sb.from('profiles').select('*').order('student_id');
               members = (data || []).map(m => ({ id: m.id, name: m.name, role: m.role, studentId: m.student_id || '',
                 nationality: m.nationality || '', dept: m.dept || '', feePaid: m.fee_paid,
-                isActive: m.is_active !== false, attendance: 0, isActive: m.is_active !== false, formerOfficer: m.is_former_officer === true, attendance: 0 })); }));
+                isActive: m.is_active !== false, formerOfficer: m.is_former_officer === true, attendance: 0 }));
             }
             
             async function loadAttendance() {
