@@ -516,6 +516,21 @@
     
     <!-- Notification Toast Container -->
     <div id="toast-container" class="fixed bottom-5 right-5 left-5 sm:left-auto z-[70] flex flex-col items-end space-y-2 pointer-events-none"></div>
+    <!-- MODAL: POST DETAIL -->
+    <div id="modal-post" class="fixed inset-0 bg-zinc-950/60 backdrop-blur-sm z-50 hidden flex justify-center p-4 overflow-y-auto" onclick="if(event.target===this)closePostDetail()">
+        <div class="bg-white rounded-2xl max-w-2xl w-full shadow-2xl border border-zinc-200 my-auto overflow-hidden">
+            <div class="px-5 py-3 border-b border-zinc-100 flex justify-between items-center">
+                <span class="text-xs font-semibold text-zinc-500">練習紀錄</span>
+                <button onclick="closePostDetail()" class="text-zinc-400 hover:text-zinc-900 text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="post-detail-body" class="p-5 space-y-4"></div>
+        </div>
+    </div>
+    
+    <!-- Notification Toast Container -->
+    <div id="toast-container" class="fixed bottom-5 right-5 left-5 sm:left-auto z-[70] flex flex-col items-end space-y-2 pointer-events-none"></div>
+    
+    <script>
            const sb = supabase.createClient('https://ojoharpeifmawtsldviw.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9qb2hhcnBlaWZtYXd0c2xkdml3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEzNDA1MjksImV4cCI6MjEwNjkxNjUyOX0.g1jFw-8Vyl_y1pu1o8y7IeilsbVyUA-CIuvDCpQbm5o');
 
         let members = [];
@@ -1393,8 +1408,7 @@
                 card.className = "bg-white rounded-xl border border-zinc-200 p-4 flex gap-4 hover:bg-zinc-50 transition cursor-pointer";
                 card.onclick = () => openPostDetail(p.id);
         
-                const isOfficer = p.role === 'OFFICER';
-                const roleBadge = badgeHTML(p.role);
+               const roleBadge = badgeHTML(p.role);
         
                 const formattedTime = new Date(p.datetime).toLocaleString((currentLang === 'en' ? 'en-US' : 'zh-TW'), {
                     month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit'
