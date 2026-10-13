@@ -775,12 +775,10 @@
                     if (data) currentUser.isActive = data.is_active !== false;
                     renderAttendanceView();
                 });
-            }
             } else if (tabName === 'practice') {
                 renderPracticeFeed();
             }
         }
-
         // --- STREAMING_CHUNK:Implementing Member Roster management and table rendering... ---
         // --- MEMBER ROSTER & FEES MANAGEMENT ---
        function renderMembersTable() {
