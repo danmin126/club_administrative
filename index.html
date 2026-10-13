@@ -607,7 +607,8 @@
             
               currentUser = { id: p.id, name: p.name, role: p.role, studentId: p.student_id,
                               nationality: p.nationality, dept: p.dept, feePaid: p.fee_paid, isActive: p.is_active !== false, attendance: 0 };
-            
+
+              if (currentUser.role === 'OFFICER' && currentUser.isActive === false) currentUser.role = 'MEMBER';
               document.getElementById('login-screen').classList.add('hidden');
               if (!appReady) {
                 document.getElementById('rollcall-date').valueAsDate = new Date();
@@ -636,7 +637,7 @@
               const { data } = await sb.from('profiles').select('*').order('student_id');
               members = (data || []).map(m => ({ id: m.id, name: m.name, role: m.role, studentId: m.student_id || '',
                 nationality: m.nationality || '', dept: m.dept || '', feePaid: m.fee_paid,
-                isActive: m.is_active !== false, attendance: 0 }));
+                isActive: m.is_active !== false, attendance: 0, isActive: m.is_active !== false, formerOfficer: m.is_former_officer === true, attendance: 0 })); }));
             }
             
             async function loadAttendance() {
@@ -770,7 +771,11 @@
             } else if (tabName === 'members') {
                 renderMembersTable();
             } else if (tabName === 'attendance') {
-                renderAttendanceView();
+                sb.from('profiles').select('is_active').eq('id', currentUser.id).single().then(({ data }) => {
+                    if (data) currentUser.isActive = data.is_active !== false;
+                    renderAttendanceView();
+                });
+            }
             } else if (tabName === 'practice') {
                 renderPracticeFeed();
             }
@@ -807,9 +812,7 @@
             const row = document.createElement('tr');
             row.className = `hover:bg-zinc-50 transition-colors border-b border-zinc-100 ${active ? '' : 'opacity-60'}`;
         
-            const roleBadge = isOfficer
-              ? `<span class="px-2 py-0.5 rounded text-xxs font-bold bg-zinc-900 text-white">幹部</span>`
-              : `<span class="px-2 py-0.5 rounded text-xxs font-medium bg-zinc-100 text-zinc-600 border border-zinc-200">社員</span>`;
+            const roleBadge = roleBadgeHTML(m);
             const archivedBadge = active ? '' : `<span class="ml-1 px-1.5 py-0.5 rounded text-xxs bg-zinc-200 text-zinc-500">已離社</span>`;
         
             const feeBadge = !active
@@ -843,14 +846,52 @@
                 <button onclick="toggleActive('${m.id}')" class="p-1.5 text-zinc-400 hover:text-zinc-900" title="${active ? '設為已離社' : '恢復在籍'}">
                   <i class="fa-solid ${active ? 'fa-box-archive' : 'fa-rotate-left'}"></i>
                 </button>
+                <button onclick="toggleOfficer('${m.id}')" class="p-1.5 text-zinc-400 hover:text-zinc-900" title="${isOfficer ? '降為社員' : '升為幹部'}"><i class="fa-solid fa-user-shield"></i></button>
+                ${!isOfficer ? `<button onclick="toggleFormer('${m.id}')" class="p-1.5 text-zinc-400 hover:text-zinc-900" title="${m.formerOfficer ? '取消卸任幹部標示' : '標為卸任幹部'}"><i class="fa-solid fa-medal"></i></button>` : ''}
               </td>`;
             tbody.appendChild(row);
           });
+        }
+
+        function roleBadgeHTML(m) {
+          if (m.role === 'OFFICER')
+            return `<span class="px-2 py-0.5 rounded text-xxs font-bold bg-zinc-900 text-white">幹部</span>`;
+          if (m.formerOfficer)
+            return `<span class="px-2 py-0.5 rounded text-xxs font-bold bg-white text-zinc-900 border border-dashed border-zinc-900">🎖 卸任幹部</span>`;
+          return `<span class="px-2 py-0.5 rounded text-xxs font-medium bg-zinc-100 text-zinc-600 border border-zinc-200">社員</span>`;
+        }
+        
+       async function toggleOfficer(id) {
+          const m = members.find(x => x.id === id);
+          if (!m) return;
+          const toOfficer = m.role !== 'OFFICER';
+          if (!confirm(toOfficer
+              ? `將「${m.name}」升為幹部？他將能看到所有社員資料與社費。`
+              : `將「${m.name}」卸任？他會變成一般社員，並標示為「卸任幹部」。`)) return;
+          const { error } = await sb.from('profiles')
+            .update({ role: toOfficer ? 'OFFICER' : 'MEMBER', is_former_officer: !toOfficer })
+            .eq('id', id);
+          if (error) return showToast('更新失敗：' + error.message, 'error');
+          await loadMembers(); await loadAttendance();
+          renderMembersTable();
+        }
+        
+        // 把現有社員標成（或取消）卸任幹部，不影響權限
+        async function toggleFormer(id) {
+          const m = members.find(x => x.id === id);
+          if (!m || m.role === 'OFFICER') return;
+          const mark = !m.formerOfficer;
+          if (!confirm(mark ? `將「${m.name}」標示為卸任幹部？` : `取消「${m.name}」的卸任幹部標示？`)) return;
+          const { error } = await sb.from('profiles').update({ is_former_officer: mark }).eq('id', id);
+          if (error) return showToast('更新失敗：' + error.message, 'error');
+          m.formerOfficer = mark;
+          renderMembersTable();
         }
         
         async function toggleActive(id) {
           const m = members.find(x => x.id === id);
           if (!m) return;
+          if (id === currentUser.id) return showToast('不能封存自己的帳號', 'warning');
           const makeActive = m.isActive === false;
           const msg = makeActive
             ? `將「${m.name}」恢復為在籍社員？`
@@ -865,6 +906,7 @@
         async function bulkSetActive(makeActive) {
           const ids = [...document.querySelectorAll('.roster-check:checked')].map(c => c.value);
           if (!ids.length) return showToast('請先勾選社員', 'warning');
+          if (!makeActive && ids.includes(currentUser.id)) return showToast('勾選名單包含你自己，無法封存自己的帳號', 'warning');
           if (!confirm(`確定要${makeActive ? '恢復' : '封存'}已勾選的 ${ids.length} 位社員？`)) return;
           const { error } = await sb.from('profiles').update({ is_active: makeActive }).in('id', ids);
           if (error) return showToast('更新失敗：' + error.message, 'error');
@@ -1010,7 +1052,7 @@
                         <div class="min-w-0">
                           <div class="font-bold text-sm text-zinc-800 flex items-center flex-wrap">
                             ${esc(m.name)}
-                            <span class="ml-1.5 text-xxs px-1.5 rounded font-bold ${m.role === 'OFFICER' ? 'bg-zinc-900 text-white' : 'bg-zinc-200 text-zinc-600'}">${m.role === 'OFFICER' ? '幹部' : '社員'}</span>
+                            ${roleBadgeHTML(m)}
                           </div>
                           <div class="text-xs text-zinc-400 font-mono">${esc(m.studentId)}</div>
                           <div class="text-xs mt-1 text-zinc-700 font-semibold">${fireText(m.attendance)}</div>
@@ -1086,12 +1128,19 @@
                 </div>`;
             }
       async function submitSelfAttendance(date) {
-        const { error } = await sb.from('attendance_reqs').insert({ date, member_id: currentUser.id });
-        if (error) return showToast('你這天已經簽到過了', 'warning');
-        await loadAttendance();
-        renderAttendanceView();
-        showToast('已完成自主簽到！待幹部審核', 'success');
-       }
+          // 先向資料庫確認最新的在籍狀態
+          const { data: me } = await sb.from('profiles').select('is_active').eq('id', currentUser.id).single();
+          if (me && me.is_active === false) {
+            currentUser.isActive = false;
+            renderAttendanceView();
+            return showToast('你已被設為離社，無法簽到', 'warning');
+          }
+          const { error } = await sb.from('attendance_reqs').insert({ date, member_id: currentUser.id });
+          if (error) return showToast('你這天已經簽到過了，或目前無法簽到', 'warning');
+          await loadAttendance();
+          renderAttendanceView();
+          showToast('已完成自主簽到！待幹部審核', 'success');
+        }
 
         async function confirmSingleAttendance(reqId) {
               const { error } = await sb.from('attendance_reqs').update({ status: 'CONFIRMED' }).eq('id', reqId);
@@ -1616,6 +1665,11 @@
             '你目前不在本學期的名單中':'You are not on this semester\'s roster',
             '🎁 獎勵一覽（學期結束 🔥 歸零）':'🎁 Rewards (🔥 resets each semester)',
             '請先勾選社員':'Please select members first','已完成幹部代簽到':'Checked in by officer',
+            '🎖 卸任幹部':'🎖 Former officer','標為卸任幹部':'Mark as former officer','取消卸任幹部標示':'Remove former-officer mark',
+              '太極社練習牆':'Practice Wall',
+              '不需要團練簽到與繳交社費，但仍可使用右上角「自主打卡」發布練習紀錄。若想回來，請聯絡幹部。':'No check-in or fees needed, but you can still post practice logs with "Log Practice" at the top right. To rejoin, please contact an officer.',
+              '你目前不在本學期的名單中':'You are not on this semester\'s roster',
+              '太極社':'Tai Chi Club',
                     };
         
         const I18N_PATTERNS = [
