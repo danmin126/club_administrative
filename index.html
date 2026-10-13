@@ -659,9 +659,30 @@
             
             async function loadPractices() {
               const { data } = await sb.from('practices').select('*').order('practiced_at', { ascending: false });
-              practices = (data || []).map(p => ({ id: p.id, memberId: p.member_id, memberName: p.member_name,
-                role: p.member_role, dept: p.dept, datetime: p.practiced_at, location: p.location,
-                photo: p.photo_url, title: p.title, notes: p.notes, isPublic: p.is_public, likes: p.likes || 0, comments: [] }));
+              practices = (data || []).map(p => ({
+                id: p.id, memberId: p.member_id, memberName: p.member_name, role: p.member_role,
+                dept: p.dept, datetime: p.practiced_at, location: p.location, photo: p.photo_url,
+                title: p.title, notes: p.notes, isPublic: p.is_public,
+                likes: 0, likedByMe: false, comments: []
+              }));
+              if (!practices.length) return;
+            
+              const [lk, cm] = await Promise.all([
+                sb.from('post_likes').select('practice_id, user_id'),
+                sb.from('post_comments').select('*').order('created_at', { ascending: true })
+              ]);
+              const byId = Object.fromEntries(practices.map(p => [p.id, p]));
+              (lk.data || []).forEach(l => {
+                const p = byId[l.practice_id];
+                if (!p) return;
+                p.likes++;
+                if (l.user_id === currentUser.id) p.likedByMe = true;
+              });
+              (cm.data || []).forEach(c => {
+                const p = byId[c.practice_id];
+                if (p) p.comments.push({ id: c.id, userId: c.user_id, name: c.author_name,
+                                         role: c.author_role, text: c.body, at: c.created_at });
+              });
             }
             
             window.addEventListener('DOMContentLoaded', bootApp);
@@ -775,8 +796,8 @@
                     if (data) currentUser.isActive = data.is_active !== false;
                     renderAttendanceView();
                 });
-            } else if (tabName === 'practice') {
-                renderPracticeFeed();
+               } else if (tabName === 'practice') {
+                loadPractices().then(renderPracticeFeed);
             }
         }
         // --- STREAMING_CHUNK:Implementing Member Roster management and table rendering... ---
@@ -1206,21 +1227,88 @@
             renderPracticeFeed();
         }
 
+        async function toggleLike(id) {
+          const p = practices.find(x => x.id === id);
+          if (!p) return;
+          const res = p.likedByMe
+            ? await sb.from('post_likes').delete().eq('practice_id', id).eq('user_id', currentUser.id)
+            : await sb.from('post_likes').insert({ practice_id: id, user_id: currentUser.id });
+          if (res.error) return showToast('操作失敗：' + res.error.message, 'error');
+          p.likedByMe = !p.likedByMe;
+          p.likes += p.likedByMe ? 1 : -1;
+          renderPracticeFeed();
+          if (openPostId === id) renderPostDetail();
+        }
+        
+        async function addComment() {
+          const p = practices.find(x => x.id === openPostId);
+          if (!p) return;
+          const input = document.getElementById('comment-input');
+          const body = input.value.trim();
+          if (!body) return showToast('請先輸入留言內容', 'warning');
+          const { data, error } = await sb.from('post_comments')
+            .insert({ practice_id: p.id, body }).select().single();
+          if (error) return showToast('留言失敗：' + error.message, 'error');
+          p.comments.push({ id: data.id, userId: data.user_id, name: data.author_name,
+                            role: data.author_role, text: data.body, at: data.created_at });
+          input.value = '';
+          renderPostDetail();
+          renderPracticeFeed();
+        }
+        
+        async function deleteComment(commentId) {
+          if (!confirm('確定要刪除這則留言？')) return;
+          const { error } = await sb.from('post_comments').delete().eq('id', commentId);
+          if (error) return showToast('沒有權限刪除', 'error');
+          const p = practices.find(x => x.id === openPostId);
+          if (p) p.comments = p.comments.filter(c => c.id !== commentId);
+          renderPostDetail();
+          renderPracticeFeed();
+        }
+        
         function postTitle(p) {
           return (p.title && p.title.trim()) || (p.notes || '').split('\n')[0].slice(0, 40) || '今日練習打卡';
         }
         
+        let openPostId = null;
+
         function openPostDetail(id) {
-          const p = practices.find(x => x.id === id);
-          if (!p) return;
-          const isOfficer = p.role === 'OFFICER';
-          const roleBadge = isOfficer
+          openPostId = id;
+          renderPostDetail();
+          document.getElementById('modal-post').classList.remove('hidden');
+          document.body.style.overflow = 'hidden';
+        }
+        
+        function renderPostDetail() {
+          const p = practices.find(x => x.id === openPostId);
+          if (!p) return closePostDetail();
+        
+          const en = (typeof currentLang !== 'undefined' && currentLang === 'en');
+          const locale = en ? 'en-US' : 'zh-TW';
+          const when = new Date(p.datetime).toLocaleString(locale,
+            { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+          const roleBadge = p.role === 'OFFICER'
             ? `<span class="bg-zinc-900 text-white text-xxs px-1.5 py-0.5 rounded font-bold">幹部</span>`
             : `<span class="bg-zinc-100 text-zinc-600 border border-zinc-200 text-xxs px-1.5 py-0.5 rounded font-medium">社員</span>`;
-          const en = (typeof currentLang !== 'undefined' && currentLang === 'en');
-          const when = new Date(p.datetime).toLocaleString(en ? 'en-US' : 'zh-TW',
-            { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
           const canDelete = p.memberId === currentUser.id || currentUser.role === 'OFFICER';
+        
+          const commentsHTML = p.comments.length ? p.comments.map(c => {
+            const canDel = c.userId === currentUser.id || currentUser.role === 'OFFICER';
+            const badge = c.role === 'OFFICER'
+              ? `<span class="bg-zinc-900 text-white text-xxs px-1.5 py-0.5 rounded font-bold">幹部</span>` : '';
+            const t = new Date(c.at).toLocaleString(locale,
+              { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            return `
+              <div class="py-2.5 border-b border-zinc-100 last:border-0">
+                <div class="flex flex-wrap items-center gap-1.5 text-xs text-zinc-500">
+                  <span class="font-semibold text-zinc-800">${esc(c.name)}</span>${badge}<span>· ${t}</span>
+                  ${canDel ? `<button onclick="deleteComment('${c.id}')" class="ml-auto text-zinc-300 hover:text-zinc-900" title="刪除留言"><i class="fa-solid fa-trash-can"></i></button>` : ''}
+                </div>
+                <p class="text-sm text-zinc-800 whitespace-pre-line break-words mt-1">${esc(c.text)}</p>
+              </div>`;
+          }).join('') : `<p class="text-xs text-zinc-400 py-3 text-center">還沒有留言，來當第一個吧</p>`;
+        
+          const draft = (document.getElementById('comment-input') || {}).value || '';
         
           document.getElementById('post-detail-body').innerHTML = `
             <h2 class="text-xl font-bold text-zinc-900 break-words">${esc(postTitle(p))}</h2>
@@ -1234,20 +1322,33 @@
             </div>
             ${p.photo ? `<a href="${esc(p.photo)}" target="_blank" rel="noopener"><img src="${esc(p.photo)}" alt="" class="w-full max-h-[70vh] object-contain bg-zinc-50 rounded-xl border border-zinc-200"></a>` : ''}
             <p class="text-sm text-zinc-800 whitespace-pre-line leading-relaxed break-words">${esc(p.notes || '無填寫心得說明')}</p>
+        
             <div class="flex items-center justify-between pt-3 border-t border-zinc-100 text-xs text-zinc-400">
-              <span>${p.isPublic !== false ? '🌐 公開文章' : '🔒 僅個人可見'}　<i class="fa-solid fa-heart"></i> ${p.likes || 0}</span>
-              ${canDelete ? `<button onclick="closePostDetail(); deletePractice('${p.id}')" class="text-zinc-400 hover:text-zinc-900"><i class="fa-solid fa-trash-can mr-1"></i>刪除</button>` : ''}
+              <button onclick="toggleLike('${p.id}')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border ${p.likedByMe ? 'bg-zinc-900 text-white border-zinc-900' : 'bg-white text-zinc-700 border-zinc-300 hover:bg-zinc-50'} font-semibold">
+                <i class="${p.likedByMe ? 'fa-solid' : 'fa-regular'} fa-heart"></i> ${p.likes}
+              </button>
+              <span>${p.isPublic !== false ? '🌐 公開文章' : '🔒 僅個人可見'}</span>
+              ${canDelete ? `<button onclick="closePostDetail(); deletePractice('${p.id}')" class="hover:text-zinc-900"><i class="fa-solid fa-trash-can mr-1"></i>刪除</button>` : ''}
+            </div>
+        
+            <div>
+              <h3 class="text-sm font-bold text-zinc-900 mb-1">留言（${p.comments.length}）</h3>
+              <div>${commentsHTML}</div>
+              <div class="mt-3 flex gap-2 items-end">
+                <textarea id="comment-input" rows="2" maxlength="500" placeholder="寫下你的留言..." class="flex-1 px-3.5 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-900/20"></textarea>
+                <button onclick="addComment()" class="px-4 py-2 bg-zinc-900 hover:bg-black text-white text-sm font-semibold rounded-xl shrink-0">送出</button>
+              </div>
             </div>`;
         
-          document.getElementById('modal-post').classList.remove('hidden');
-          document.body.style.overflow = 'hidden';
+          document.getElementById('comment-input').value = draft;   // 按讚重畫時保留還沒送出的草稿
         }
         
         function closePostDetail() {
+          openPostId = null;
           document.getElementById('modal-post').classList.add('hidden');
           document.body.style.overflow = '';
         }
-        
+                
         document.addEventListener('keydown', e => { if (e.key === 'Escape') closePostDetail(); });
         
         function renderPracticeFeed() {
@@ -1300,7 +1401,8 @@
                     <p class="text-sm text-zinc-500 line-clamp-2 mt-1">${esc(p.notes || '')}</p>
                     <div class="flex items-center gap-4 mt-3 text-xs text-zinc-400">
                       <span class="truncate"><i class="fa-solid fa-location-dot"></i> ${esc(p.location)}</span>
-                      <span><i class="fa-solid fa-heart"></i> ${p.likes || 0}</span>
+                      <button onclick="event.stopPropagation(); toggleLike('${p.id}')" class="flex items-center gap-1 hover:text-zinc-900 ${p.likedByMe ? 'text-zinc-900 font-bold' : ''}"><i class="${p.likedByMe ? 'fa-solid' : 'fa-regular'} fa-heart"></i> ${p.likes || 0}</button>
+                      <span><i class="fa-regular fa-comment"></i> ${p.comments.length}</span>
                       <span class="text-zinc-300">${p.isPublic !== false ? '🌐' : '🔒'}</span>
                     </div>
                   </div>
@@ -1309,14 +1411,7 @@
                 grid.appendChild(card);
             });
         }
-        function likePractice(id) {
-            const p = practices.find(x => x.id === id);
-            if (p) {
-                p.likes = (p.likes || 0) + 1;
-                saveData();
-                renderPracticeFeed();
-            }
-        }
+        
 
        async function deletePractice(id) {
           if (!confirm(tr('確定要刪除這篇打卡紀錄嗎？'))) return;
@@ -1668,6 +1763,10 @@
               '不需要團練簽到與繳交社費，但仍可使用右上角「自主打卡」發布練習紀錄。若想回來，請聯絡幹部。':'No check-in or fees needed, but you can still post practice logs with "Log Practice" at the top right. To rejoin, please contact an officer.',
               '你目前不在本學期的名單中':'You are not on this semester\'s roster',
               '太極社':'Tai Chi Club',
+              '送出':'Send','寫下你的留言...':'Write a comment...','刪除留言':'Delete comment',
+              '還沒有留言，來當第一個吧':'No comments yet. Be the first!',
+              '確定要刪除這則留言？':'Delete this comment?','請先輸入留言內容':'Please enter a comment',
+              '留言失敗：':'Comment failed: ',
                     };
         
         const I18N_PATTERNS = [
@@ -1689,6 +1788,7 @@
           [/^註冊失敗：(.*)$/, 'Sign-up failed: $1'],
           [/^照片上傳失敗：(.*)$/, 'Photo upload failed: $1'],
           [/^發布失敗：(.*)$/, 'Post failed: $1']
+          [/^留言（(\d+)）$/, 'Comments ($1)'],
         ];
         
         // 翻譯一段字串（也可用在 confirm() 之類）
